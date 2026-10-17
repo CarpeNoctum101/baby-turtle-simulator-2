@@ -9,7 +9,7 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import type { Scene } from "@babylonjs/core/scene";
 import { applySandUVs, createSandMaterials } from "./createSandMaterials";
-import { beachHeight, seededRandom, smoothstep } from "./landscape";
+import { beachHeight, inlandZ, seededRandom, smoothstep } from "./landscape";
 import { course } from "../../movement/course";
 
 export function createBeachLand(scene: Scene): void {
@@ -84,7 +84,7 @@ function addShoreDetails(scene: Scene): void {
   for (let i = 0; i < 68; i++) {
     const rock = stone.createInstance(`previewRock${i}`);
     const side = i % 2 ? 1 : -1;
-    const x = side * (course.halfWidth + 0.4 + random() * 11), z = -31 + random() * 43;
+    const x = side * (course.halfWidth + 0.4 + random() * 11), z = inlandZ(-31, 2, random);
     const size = 0.12 + random() ** 2 * 1.5;
     rock.position.set(x, beachHeight(x, z) + size * 0.08, z);
     rock.scaling.set(size * 1.3, size * 0.65, size);
@@ -98,7 +98,7 @@ function addShoreDetails(scene: Scene): void {
   const branches: Mesh[] = [];
   for (let i = 0; i < 11; i++) {
     const side = i % 2 ? -1 : 1;
-    const x = side * (course.halfWidth + 0.8 + random() * 4), z = -25 + random() * 33;
+    const x = side * (course.halfWidth + 0.8 + random() * 4), z = inlandZ(-25, 6, random);
     const base = new Vector3(x, beachHeight(x, z) + 0.08, z);
     const length = 0.5 + random() * 1.4;
     const angle = random() * Math.PI * 2;

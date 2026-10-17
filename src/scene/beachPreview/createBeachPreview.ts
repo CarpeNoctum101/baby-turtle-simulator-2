@@ -10,13 +10,12 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
-import { InstancedMesh } from "@babylonjs/core/Meshes/instancedMesh";
 import { Scene } from "@babylonjs/core/scene";
 import { createPalm } from "./createPalm";
 import { createAtmosphere } from "./createAtmosphere";
 import { createOcean } from "./createOcean";
 import { createBeachLand } from "./createBeachLand";
-import { beachHeight, seededRandom } from "./landscape";
+import { beachHeight, inlandZ, seededRandom } from "./landscape";
 import { course } from "../../movement/course";
 
 /** A visual study isolated from the unchanged race prototype and movement rules. */
@@ -50,22 +49,24 @@ export function createBeachPreview(scene: Scene, sun: DirectionalLight, fill: He
 
   const palmX = -course.halfWidth - 1.4;
   const palm = createPalm(scene, new Vector3(palmX, beachHeight(palmX, -10), -10));
+  const shore = course.water.minZ;
   for (const [i, spot] of [
-    { x: course.halfWidth+4.8, z: -6, scale: 1.12, yaw: 1.5 },
-    { x: -course.halfWidth-7, z: 3, scale: 0.92, yaw: -0.7 },
-    { x: -course.halfWidth-10, z: -24, scale: 1.18, yaw: 0.8 },
-    { x: course.halfWidth+9, z: 9, scale: 0.9, yaw: 2.7 },
+    { x: course.halfWidth + 4.8, z: shore - 20, scale: 1.12, yaw: 1.5 },
+    { x: -course.halfWidth - 7, z: shore - 11, scale: 0.92, yaw: -0.7 },
+    { x: -course.halfWidth - 10, z: course.nest.z, scale: 1.18, yaw: 0.8 },
+    { x: course.halfWidth + 9, z: shore - 5, scale: 0.9, yaw: 2.7 },
   ].entries()) {
     const root = new TransformNode(`previewPalmInstance${i}`, scene);
     root.position.set(spot.x, beachHeight(spot.x, spot.z), spot.z);
     root.scaling.setAll(spot.scale);
     root.rotation.y = spot.yaw;
     for (const source of palm.getChildMeshes()) {
-      const instance = (source as Mesh).createInstance(`${source.name}Instance${i}`);
-      instance.parent = root;
+      // createInstance keeps the parent but not the local transform, so the crown would sit at the roots.
+      copyPalmPiece(source as Mesh, root, `${source.name}Instance${i}`);
     }
   }
   createGrass(scene);
+  seatRaceMarkers(scene);
 
   const shadows = new ShadowGenerator(Math.min(2048, scene.getEngine().getCaps().maxTextureSize), sun);
   const engine = scene.getEngine();
@@ -86,8 +87,8 @@ export function createBeachPreview(scene: Scene, sun: DirectionalLight, fill: He
       const isTurtle = !!turtle && mesh.isDescendantOf(turtle);
       if (mesh.isEnabled() && (isTurtle || /^(palm|previewRock|previewDriftwood|previewGrass)/.test(mesh.name))) {
         shadows.addShadowCaster(mesh, false);
-        if (mesh instanceof InstancedMesh) mesh.sourceMesh.receiveShadows = true;
-        else mesh.receiveShadows = !isTurtle;
+        // receiveShadows is per mesh. Instances do not inherit it from the source.
+        mesh.receiveShadows = !isTurtle;
       }
     }
   });
@@ -124,10 +125,34 @@ function createGrass(scene: Scene): void {
   grass.position.set(grassX, beachHeight(grassX,-10.3), -10.3);
   const random = seededRandom(912);
   for (let i = 0; i < 50; i++) {
-    const x = (i % 2 ? -1 : 1) * (course.halfWidth + 0.5 + random() * 12), z = -36 + random() * 45;
+    const x = (i % 2 ? -1 : 1) * (course.halfWidth + 0.5 + random() * 12), z = inlandZ(-36, 5, random);
     const tuft = grass.createInstance(`previewGrass${i}`);
     tuft.position.set(x, beachHeight(x,z), z);
     tuft.scaling.setAll(0.7 + random() * 1.4);
     tuft.rotation.y = random() * Math.PI * 2;
+  }
+}
+
+/** Copies the source piece's local transform. Instances otherwise spawn at the new root's origin. */
+export function copyPalmPiece(source: Mesh, parent: TransformNode, name: string): void {
+  const instance = source.createInstance(name);
+  instance.position.copyFrom(source.position);
+  instance.rotation.copyFrom(source.rotation);
+  if (source.rotationQuaternion) instance.rotationQuaternion = source.rotationQuaternion.clone();
+  instance.scaling.copyFrom(source.scaling);
+  instance.parent = parent;
+}
+
+/**
+ * The flat course markers were built to sit on strips and the raised nest.
+ * Those blocks are hidden here, so put the markers on the sculpted sand instead.
+ * Markers past the shoreline sit just above the water surface.
+ */
+export function seatRaceMarkers(scene: Scene): void {
+  for (const mesh of scene.meshes) {
+    if (!/^startPad-|^startLine$|^routeDash|^routePost/.test(mesh.name)) continue;
+    const halfHeight = mesh.getBoundingInfo().boundingBox.extendSize.y * Math.abs(mesh.scaling.y);
+    const bed = mesh.position.z >= course.water.minZ ? 0.05 : beachHeight(mesh.position.x, mesh.position.z);
+    mesh.position.y = bed + halfHeight + 0.012;
   }
 }
