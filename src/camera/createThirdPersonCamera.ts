@@ -2,39 +2,69 @@ import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { Scene } from "@babylonjs/core/scene";
+import type { LookOffsets } from "../input/stepLook";
+
+export interface FollowCameraRig {
+  camera: ArcRotateCamera;
+  radius: number;
+  dispose: () => void;
+}
 
 /**
- * Sits behind and slightly above the turtle.
- * alpha rotates around the turtle, beta raises or lowers the view, and radius is distance.
- * Dragging orbits the turtle for this prototype. Later milestones will drive the camera
- * from the turtle's heading instead of leaving orbit free.
+ * A low camera behind the turtle. It eases toward the turtle's heading
+ * instead of snapping, and mouse or right-stick look is added on top.
  */
-export function createThirdPersonCamera(scene: Scene, turtle: TransformNode): ArcRotateCamera {
+export function createFollowCamera(scene: Scene, turtle: TransformNode): FollowCameraRig {
   const aim = new TransformNode("cameraAim", scene);
   aim.parent = turtle;
-  aim.position = new Vector3(0, 0.4, 0);
+  aim.position = new Vector3(0, 0.45, 0);
 
-  const camera = new ArcRotateCamera(
-    "thirdPerson",
-    -Math.PI / 2,
-    1.15,
-    6,
-    aim.position.clone(),
-    scene,
-  );
+  const camera = new ArcRotateCamera("thirdPerson", -Math.PI / 2, 1.22, 6.5, aim.position.clone(), scene);
   camera.lockedTarget = aim;
-  camera.lowerRadiusLimit = 3;
-  camera.upperRadiusLimit = 16;
-  camera.lowerBetaLimit = 0.35;
-  camera.upperBetaLimit = Math.PI / 2 - 0.08;
+  camera.lowerBetaLimit = 0.85;
+  camera.upperBetaLimit = 1.48;
+  camera.inertia = 0;
   camera.panningSensibility = 0;
-  camera.wheelDeltaPercentage = 0.02;
-  camera.inertia = 0.8;
 
   const canvas = scene.getEngine().getRenderingCanvas();
-  if (canvas) {
-    camera.attachControl(canvas, true);
-  }
+  let onWheel: (event: WheelEvent) => void = () => {};
+  const rig: FollowCameraRig = {
+    camera,
+    radius: 6.5,
+    dispose() {
+      canvas?.removeEventListener("wheel", onWheel);
+    },
+  };
+  onWheel = (event: WheelEvent) => {
+    event.preventDefault();
+    const direction = Math.sign(event.deltaY);
+    rig.radius = clamp(rig.radius + direction * 0.45, 3.5, 14);
+  };
+  canvas?.addEventListener("wheel", onWheel, { passive: false });
 
-  return camera;
+  return rig;
+}
+
+export function updateFollowCamera(rig: FollowCameraRig, heading: number, look: LookOffsets, dt: number): void {
+  const safeDt = Math.min(Math.max(dt, 0), 0.05);
+  const blend = 1 - Math.exp(-6 * safeDt);
+  const desiredAlpha = -Math.PI / 2 - heading + look.yaw;
+  const desiredBeta = clamp(1.22 + look.pitch, rig.camera.lowerBetaLimit ?? 0.85, rig.camera.upperBetaLimit ?? 1.48);
+
+  rig.camera.alpha = lerpAngle(rig.camera.alpha, desiredAlpha, blend);
+  rig.camera.beta = lerp(rig.camera.beta, desiredBeta, blend);
+  rig.camera.radius = lerp(rig.camera.radius, rig.radius, blend);
+}
+
+function lerp(current: number, target: number, amount: number): number {
+  return current + (target - current) * amount;
+}
+
+function lerpAngle(current: number, target: number, amount: number): number {
+  const difference = Math.atan2(Math.sin(target - current), Math.cos(target - current));
+  return current + difference * amount;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }

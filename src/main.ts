@@ -2,16 +2,15 @@ import { startGame } from "./game/startGame";
 import "./style.css";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#renderCanvas");
-const status = document.querySelector<HTMLElement>("#status");
+const hud = document.querySelector<HTMLElement>("#hud");
+const hudToggle = document.querySelector<HTMLButtonElement>("#hudToggle");
 
-if (!canvas || !status) {
-  throw new Error("The page is missing the render canvas or status message.");
+if (!canvas || !hud || !hudToggle) {
+  throw new Error("The page is missing the render canvas or the control readout.");
 }
 
 try {
-  const game = startGame(canvas);
-  status.textContent =
-    "Prototype scene is running. Drag to orbit the turtle. Scroll to zoom. The turtle does not move yet.";
+  const game = startGame(canvas, hud, hudToggle);
 
   if (import.meta.hot) {
     import.meta.hot.dispose(() => {
@@ -20,6 +19,6 @@ try {
   }
 } catch (error) {
   const message = error instanceof Error ? error.message : "Unknown error";
-  status.textContent = `Could not start the 3D scene. ${message}`;
+  hud.textContent = `Could not start the 3D scene. ${message}`;
   console.error(error);
 }
