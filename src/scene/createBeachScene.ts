@@ -5,12 +5,13 @@ import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Scene } from "@babylonjs/core/scene";
 import { createCourse } from "./createCourse";
+import { createBeachPreview } from "./beachPreview/createBeachPreview";
 
 /**
  * Creates the dawn beach: sky, lights, and the nest-to-sea course.
  * The turtle and camera are added by the caller.
  */
-export function createBeachScene(engine: Engine): Scene {
+export function createBeachScene(engine: Engine, beachPreview = false): Scene {
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0.58, 0.75, 0.9, 1);
 
@@ -25,6 +26,7 @@ export function createBeachScene(engine: Engine): Scene {
   sun.diffuse = new Color3(1, 0.9, 0.72);
 
   createCourse(scene);
+  if (beachPreview) createBeachPreview(scene, sun, fillLight);
 
   return scene;
 }

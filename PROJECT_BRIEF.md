@@ -30,6 +30,21 @@ Tide Orb pickups provide temporary abilities. Players use these abilities to gai
 
 The first version needs one polished beach course and a working start-to-finish race. Do not create an open world.
 
+## Finish celebration
+
+After the turtle enters the ocean finish zone, raise a procedural SpaceX Starship,
+launch platform and connected boarding walkway out of the sea. The turtle waits
+until the walkway is ready, then automatically crawls up the ramp, boards the rocket, and
+is carried into space after a countdown. Use a cinematic camera, engine effects,
+stars and a procedural Earth backdrop. No player input is needed after finishing.
+Keep the cinematic free of action descriptions; show only the numerical launch
+countdown and a small restart hint.
+
+Ignore race movement/look input during the ending. R must restart the race from any
+stage and restore the turtle, beach, camera and lighting. Keep the existing finish
+coordinates and pre-finish controls. Use original locally created assets at $0.
+This finish celebration does not mark the full race-flow/pickup or ability milestones complete.
+
 ## Movement and controller
 
 Support an Xbox-compatible gamepad through the browser Gamepad API and a keyboard fallback.

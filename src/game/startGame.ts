@@ -23,6 +23,7 @@ import { canDrive, countdownLabel, createRaceState, formatRaceTime, startCountdo
 import { createRivalMotion, raceStanding, stepRival } from "../race/stepRival";
 import { createBeachScene } from "../scene/createBeachScene";
 import { stepTurtleAnimation, type TurtleAnimation } from "../turtle/animateTurtle";
+<<<<<<< HEAD
 import { createPlaceholderTurtle, type PlaceholderTurtle } from "../turtle/createPlaceholderTurtle";
 
 export interface GameUi {
@@ -43,6 +44,12 @@ export interface GameUi {
   abilityTimerLabel: HTMLElement;
   abilityMeterFill: HTMLElement;
 }
+=======
+import { createPlaceholderTurtle } from "../turtle/createPlaceholderTurtle";
+import { createDetailedTurtle } from "../turtle/createDetailedTurtle";
+import { createEndingState, sampleEnding, stepEnding, type EndingState } from "./endingState";
+import { createSpaceEnding } from "../scene/ending/createSpaceEnding";
+>>>>>>> graphics
 
 export interface RunningGame {
   engine: Engine;
@@ -50,6 +57,7 @@ export interface RunningGame {
   dispose: () => void;
 }
 
+<<<<<<< HEAD
 const idleDrive: DriveInput = { throttle: 0, steer: 0, brake: false };
 
 /**
@@ -66,12 +74,29 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi): RunningGame {
     shell: new Color3(0.25, 0.4, 0.48),
   });
   const camera = createFollowCamera(scene);
+=======
+/** Builds the beach, then crawls the turtle from the inputs each frame. */
+export function startGame(canvas: HTMLCanvasElement, hud: HTMLElement, hudToggle: HTMLButtonElement, beachPreview = false): RunningGame {
+  const engine = new Engine(canvas, true, { adaptToDeviceRatio: true });
+  const scene = createBeachScene(engine, beachPreview);
+  const turtle = beachPreview ? createDetailedTurtle(scene) : createPlaceholderTurtle(scene);
+  const camera = createFollowCamera(scene, turtle.root);
+  const spaceEnding = createSpaceEnding(scene, turtle);
+  // Frame the asset study on entry; the normal course and camera controls are unchanged.
+  const initialLook: LookOffsets = beachPreview ? { yaw: 0.35, pitch: 0.22 } : { yaw: 0, pitch: 0 };
+  if (beachPreview) {
+    camera.radius = camera.camera.radius = 9;
+    camera.camera.alpha += initialLook.yaw;
+    camera.camera.beta += initialLook.pitch;
+  }
+>>>>>>> graphics
   const keyboard = createKeyboardState(window);
   const mouse = createMouseLook(canvas);
   const cues = createAbilityCues();
   const fx = createAbilityFx(scene, turtle.visual);
 
   let motion = createTurtleMotion();
+<<<<<<< HEAD
   let rival = createRivalMotion(motion);
   let look: LookOffsets = { yaw: 0, pitch: 0 };
   let race = createRaceState();
@@ -82,6 +107,13 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi): RunningGame {
   const animation: TurtleAnimation = { phase: 0 };
   const rivalAnimation: TurtleAnimation = { phase: 0 };
   let hudVisible = true;
+=======
+  let look: LookOffsets = { ...initialLook };
+  const animation: TurtleAnimation = { phase: 0 };
+  let finished = false;
+  let ending: EndingState | null = null;
+  let hudVisible = !beachPreview;
+>>>>>>> graphics
   const heldEdges = new Set<string>();
 
   const placeTurtle = (body: PlaceholderTurtle, next: TurtleMotion) => {
@@ -123,7 +155,18 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi): RunningGame {
   const onToggleHud = () => {
     setHudVisible(!hudVisible);
   };
+<<<<<<< HEAD
   ui.hudToggle.addEventListener("click", onToggleHud);
+=======
+  hudToggle.addEventListener("click", onToggleHud);
+  setHudVisible(hudVisible);
+
+  const placeTurtle = (next: TurtleMotion) => {
+    turtle.root.position.set(next.x, 0, next.z);
+    turtle.root.rotation.y = next.heading;
+  };
+  placeTurtle(motion);
+>>>>>>> graphics
 
   const pressedOnce = (code: string) => {
     if (!keyboard.keys.has(code)) {
@@ -162,6 +205,7 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi): RunningGame {
 
     const gamepad = pollGamepads(controlSettings.stickDeadZone);
     const movement = combineMovement(readKeyboard(keyboard.keys), gamepad);
+<<<<<<< HEAD
     const drive = canDrive(race.phase) ? movement : idleDrive;
     const abilityDown = keyboard.keys.has("KeyX") || gamepad.ability;
     const activate = abilityDown && !abilityWasDown;
@@ -187,9 +231,32 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi): RunningGame {
       }
       if (ticked.cues.includes("block")) {
         blockFlash = 0.28;
+=======
+    if (pressedOnce("KeyR")) {
+      spaceEnding.reset();
+      ending = null;
+      motion = createTurtleMotion();
+      look = { ...initialLook };
+      finished = false;
+      animation.phase = 0;
+      setHudVisible(!beachPreview);
+      mouse.consume();
+    } else if (ending) {
+      ending = stepEnding(ending, dt);
+      // Discard look deltas while the cinematic owns the camera.
+      mouse.consume();
+    } else {
+      motion = stepTurtle(motion, movement, dt);
+      if (!finished && isInFinishZone(motion.x, motion.z)) {
+        finished = true;
+        ending = createEndingState(motion);
+        spaceEnding.begin();
+        setHudVisible(false);
+>>>>>>> graphics
       }
     }
 
+<<<<<<< HEAD
     if (race.phase === "racing" || race.phase === "countdown") {
       motion = stepTurtle(motion, drive, dt, planFromYaw(look.yaw), speedModifiers(world.loadout.effects));
       if (race.phase === "racing") {
@@ -234,6 +301,26 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi): RunningGame {
       phase: race.phase,
       elapsed: race.elapsed,
       finishTime: race.finishTime,
+=======
+    const endingFrame = ending ? sampleEnding(ending) : null;
+    if (endingFrame) {
+      spaceEnding.update(endingFrame, dt);
+    } else {
+      placeTurtle(motion);
+      updateFollowCamera(camera, motion.heading, look, dt);
+    }
+    stepTurtleAnimation(animation, turtle.visual, turtle.flippers, endingFrame?.speed ?? motion.speed, dt);
+    if (endingFrame?.phase === "boarding") {
+      // Fold the broad paddles back so the turtle fits through the hatch.
+      const tuck = Math.min(1, endingFrame.phaseTime / 0.5);
+      for (const flipper of turtle.flippers) {
+        flipper.mesh.rotation.y = flipper.baseY + (flipper.side * 1.4 - flipper.baseY) * tuck;
+        flipper.mesh.rotation.z *= 1 - tuck;
+      }
+    }
+    hud.textContent = formatHud({
+      finished,
+>>>>>>> graphics
       surfaceLabel: surfaceAt(motion.z).label,
       speed: motion.speed,
       x: motion.x,
@@ -265,7 +352,11 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi): RunningGame {
       ui.rematchButton.removeEventListener("click", beginFromMenu);
       keyboard.dispose();
       mouse.dispose();
+<<<<<<< HEAD
       cues.dispose();
+=======
+      spaceEnding.dispose();
+>>>>>>> graphics
       camera.dispose();
       scene.dispose();
       engine.dispose();

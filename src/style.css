@@ -53,6 +53,7 @@ body {
   white-space: pre-wrap;
 }
 
+<<<<<<< HEAD
 .overlay {
   position: absolute;
   inset: 0;
@@ -245,3 +246,46 @@ body {
 #abilityHud[data-tone="trail"] #abilityMeterFill {
   background: #d7c4ff;
 }
+=======
+#beachPreviewLink {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 248, 230, 0.5);
+  border-radius: 24px;
+  color: #fff8e6;
+  background: rgba(31, 51, 48, 0.85);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+#beachPreviewLink:hover,
+#beachPreviewLink:focus-visible {
+  background: #243e38;
+  outline: 2px solid #fff8e6;
+  outline-offset: 3px;
+}
+
+.ending-overlay {
+  position: absolute;
+  z-index: 3;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 16px 20px 18px;
+  color: #f4f8ff;
+  text-shadow: 0 1px 6px #040d1a;
+  text-align: center;
+  pointer-events: none;
+}
+
+.ending-overlay[hidden] { display: none; }
+.ending-overlay .ending-restart { margin: 12px 0 0; color: #c8d7e7; font-size: 12px; }
+.ending-countdown { margin: 8px 0; font-size: 64px; font-weight: 700; line-height: 1; }
+.ending-countdown:empty { display: none; }
+body:has(.ending-overlay:not([hidden])) #beachPreviewLink,
+body:has(.ending-overlay:not([hidden])) #hudToggle,
+body:has(.ending-overlay:not([hidden])) #hud { display: none; }
+>>>>>>> graphics
