@@ -1,0 +1,30 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #93c0e0;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+#renderCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  outline: none;
+}
+
+#status {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  max-width: min(36rem, calc(100% - 32px));
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: #1c2618;
+  background: rgba(255, 248, 230, 0.9);
+  font-size: 14px;
+  line-height: 1.4;
+}
