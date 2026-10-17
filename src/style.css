@@ -38,6 +38,7 @@ body {
   position: absolute;
   top: 48px;
   left: 12px;
+  z-index: 2;
   max-width: min(42rem, calc(100% - 24px));
   max-height: calc(100% - 24px);
   overflow: auto;
@@ -50,4 +51,86 @@ body {
   font-size: 13px;
   line-height: 1.45;
   white-space: pre-wrap;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(18, 32, 42, 0.35);
+}
+
+.overlay[hidden] {
+  display: none;
+}
+
+.panel {
+  width: min(28rem, calc(100% - 32px));
+  margin: 0;
+  padding: 24px 22px;
+  border-radius: 14px;
+  color: #1c2618;
+  background: rgba(255, 248, 230, 0.96);
+  text-align: center;
+}
+
+.panel h1,
+.panel h2,
+.panel p {
+  margin: 0 0 12px;
+}
+
+.panel button,
+#hudToggle {
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.panel button {
+  margin-top: 8px;
+  padding: 10px 18px;
+  color: #f7f3e6;
+  background: #2f6f62;
+  font: 16px "Segoe UI", system-ui, sans-serif;
+}
+
+.panel button:hover {
+  background: #275c51;
+}
+
+#countdown,
+#raceTimer {
+  position: absolute;
+  left: 50%;
+  z-index: 4;
+  margin: 0;
+  transform: translateX(-50%);
+  color: #f7f3e6;
+  text-shadow: 0 2px 8px rgba(20, 32, 24, 0.45);
+  pointer-events: none;
+}
+
+#countdown {
+  top: 16%;
+  font-size: 96px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+#raceTimer {
+  top: 16px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(20, 32, 24, 0.45);
+  font-size: 28px;
+  font-variant-numeric: tabular-nums;
+}
+
+#countdown[hidden],
+#raceTimer[hidden] {
+  display: none;
 }

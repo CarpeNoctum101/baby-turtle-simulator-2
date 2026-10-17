@@ -9,6 +9,24 @@
     <canvas id="renderCanvas" tabindex="0"></canvas>
     <button id="hudToggle" type="button" aria-controls="hud" aria-expanded="true">Hide readout</button>
     <pre id="hud">Starting the beach scene…</pre>
+    <p id="countdown" hidden>3</p>
+    <p id="raceTimer" hidden>0:00.0</p>
+    <section id="startScreen" class="overlay">
+      <div class="panel">
+        <h1>Baby Turtle Simulator</h1>
+        <p>Crawl from the nest, across the beach, and through the gate into the sea.</p>
+        <p>The left stick moves. Up follows the camera, and left or right move sideways. Only the right stick turns the camera, including up and down. Space or B brakes.</p>
+        <button id="startRace" type="button">Start race</button>
+      </div>
+    </section>
+    <section id="results" class="overlay" hidden>
+      <div class="panel">
+        <h2>You reached the sea</h2>
+        <p id="resultsPlace">1st of 1</p>
+        <p id="resultsTime">Time 0:00.0</p>
+        <button id="rematch" type="button">Rematch</button>
+      </div>
+    </section>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

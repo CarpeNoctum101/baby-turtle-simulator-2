@@ -2,8 +2,8 @@ export type SurfaceId = "dry-sand" | "wet-sand" | "shallow-water";
 
 /**
  * How the ground changes the crawl.
- * Dry sand is slow and stops quickly. Wet sand is the easiest crawl.
- * Shallow water is fastest and keeps gliding, with heavier steering.
+ * Dry sand is slow and stops almost at once. Wet sand is the easiest crawl.
+ * Shallow water is the fastest, with a short glide and steering that still answers.
  */
 export interface SurfaceProfile {
   id: SurfaceId;
@@ -26,10 +26,10 @@ export const surfaces: Record<SurfaceId, SurfaceProfile> = {
     maxSpeed: 3.2,
     maxReverseSpeed: 1.1,
     acceleration: 2.1,
-    deceleration: 4.8,
-    brakeDeceleration: 8,
-    turnRate: 1.6,
-    steerResponse: 4,
+    deceleration: 7.5,
+    brakeDeceleration: 12,
+    turnRate: 3.4,
+    steerResponse: 8,
   },
   "wet-sand": {
     id: "wet-sand",
@@ -37,20 +37,20 @@ export const surfaces: Record<SurfaceId, SurfaceProfile> = {
     maxSpeed: 5.6,
     maxReverseSpeed: 1.6,
     acceleration: 4.4,
-    deceleration: 3,
-    brakeDeceleration: 7,
-    turnRate: 2.15,
-    steerResponse: 8,
+    deceleration: 6,
+    brakeDeceleration: 10,
+    turnRate: 3.8,
+    steerResponse: 10,
   },
   "shallow-water": {
     id: "shallow-water",
     label: "Shallow water",
-    maxSpeed: 8.4,
+    maxSpeed: 7.2,
     maxReverseSpeed: 2.2,
-    acceleration: 5.8,
-    deceleration: 1.25,
-    brakeDeceleration: 4.5,
-    turnRate: 1.35,
-    steerResponse: 2.8,
+    acceleration: 5.4,
+    deceleration: 5,
+    brakeDeceleration: 9.5,
+    turnRate: 3,
+    steerResponse: 7,
   },
 };

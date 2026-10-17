@@ -1,9 +1,27 @@
-import { clampToBeach, clampToCourse, course, surfaceAt } from "./course";
+import { clampToBeach, clampToCourse, playerStart, surfaceAt } from "./course";
 
 export interface DriveInput {
+  /** Positive moves the way the camera looks. Negative moves the opposite way. */
   throttle: number;
+  /** Positive moves to the camera's right. */
   steer: number;
   brake: boolean;
+}
+
+/** Flat direction the camera is facing. Stick up follows this. */
+export interface CameraPlan {
+  forwardX: number;
+  forwardZ: number;
+}
+
+export const oceanPlan: CameraPlan = { forwardX: 0, forwardZ: 1 };
+
+/** Yaw 0 looks toward the ocean. Negative yaw looks to the turtle's right. */
+export function planFromYaw(yaw: number): CameraPlan {
+  return {
+    forwardX: -Math.sin(yaw) || 0,
+    forwardZ: Math.cos(yaw) || 0,
+  };
 }
 
 /** Position and crawl state. This is plain data, separate from the 3D meshes. */
@@ -13,14 +31,14 @@ export interface TurtleMotion {
   /** 0 faces toward +Z, the ocean. */
   heading: number;
   speed: number;
-  /** Smoothed steer, from -1 to 1. It lags behind the stick. */
+  /** Latest sideways input, from -1 to 1. */
   steer: number;
 }
 
 export function createTurtleMotion(): TurtleMotion {
   return {
-    x: course.nest.x,
-    z: course.nest.z,
+    x: playerStart.x,
+    z: playerStart.z,
     heading: 0,
     speed: 0,
     steer: 0,
@@ -29,39 +47,58 @@ export function createTurtleMotion(): TurtleMotion {
 
 /**
  * Advances the crawl by one slice of time.
- * Speed builds and fades instead of jumping, and the heading follows the steer
- * a moment later. The surface under the turtle changes acceleration, top speed,
- * coasting, and how heavy the turn feels.
+ * Stick up, or W, moves along the camera's ground direction.
+ * Stick left and right move sideways relative to that same camera. They do not turn it.
+ * The surface changes acceleration, top speed, and coasting.
  */
-export function stepTurtle(state: TurtleMotion, input: DriveInput, dt: number): TurtleMotion {
+export function stepTurtle(
+  state: TurtleMotion,
+  input: DriveInput,
+  dt: number,
+  plan: CameraPlan = oceanPlan,
+): TurtleMotion {
   const safeDt = Math.min(Math.max(dt, 0), 0.05);
   const surface = surfaceAt(state.z);
-  const steerLag = Math.exp(-surface.steerResponse * safeDt);
-  const steer = input.steer + (state.steer - input.steer) * steerLag;
+  const wish = wishDirection(input.throttle, input.steer, plan);
 
-  const speedRatio = surface.maxSpeed === 0 ? 0 : Math.min(1, Math.abs(state.speed) / surface.maxSpeed);
-  const turnStrength = 0.35 + 0.65 * speedRatio;
-  const heading = wrapAngle(state.heading + steer * surface.turnRate * turnStrength * safeDt);
-
+  let heading = state.heading;
   let speed = state.speed;
   if (input.brake) {
     speed = moveToward(speed, 0, surface.brakeDeceleration * safeDt);
-  } else if (input.throttle > 0) {
-    speed += input.throttle * surface.acceleration * safeDt;
-  } else if (input.throttle < 0) {
-    speed += input.throttle * surface.acceleration * 0.6 * safeDt;
+  } else if (wish) {
+    heading = wish.heading;
+    speed += wish.amount * surface.acceleration * safeDt;
   } else {
     speed = moveToward(speed, 0, surface.deceleration * safeDt);
   }
 
-  speed = clamp(speed, -surface.maxReverseSpeed, surface.maxSpeed);
+  speed = clamp(speed, 0, surface.maxSpeed);
 
   return {
     x: clampToBeach(state.x + Math.sin(heading) * speed * safeDt),
     z: clampToCourse(state.z + Math.cos(heading) * speed * safeDt),
     heading,
     speed,
-    steer,
+    steer: input.steer,
+  };
+}
+
+function wishDirection(
+  throttle: number,
+  steer: number,
+  plan: CameraPlan,
+): { heading: number; amount: number } | null {
+  const rightX = plan.forwardZ;
+  const rightZ = -plan.forwardX;
+  const wishX = plan.forwardX * throttle + rightX * steer;
+  const wishZ = plan.forwardZ * throttle + rightZ * steer;
+  const amount = Math.hypot(wishX, wishZ);
+  if (amount < 0.001) {
+    return null;
+  }
+  return {
+    heading: Math.atan2(wishX, wishZ),
+    amount: Math.min(1, amount),
   };
 }
 
@@ -74,9 +111,4 @@ function moveToward(current: number, target: number, maxDelta: number): number {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
-}
-
-function wrapAngle(angle: number): number {
-  const fullTurn = Math.PI * 2;
-  return angle - fullTurn * Math.floor((angle + Math.PI) / fullTurn);
 }

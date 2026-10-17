@@ -2,7 +2,7 @@ import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Scene } from "@babylonjs/core/scene";
-import { course } from "../movement/course";
+import { course, startingGrid } from "../movement/course";
 
 /** Draws the nest, the three surface bands, and the finish gate. */
 export function createCourse(scene: Scene): void {
@@ -47,6 +47,8 @@ export function createCourse(scene: Scene): void {
   addBerm(scene, course.halfWidth + 0.45);
   addBerm(scene, -course.halfWidth - 0.45);
   addNest(scene);
+  addStartingGrid(scene);
+  addRoute(scene);
   addFinishGate(scene);
 }
 
@@ -80,9 +82,13 @@ function addBerm(scene: Scene, x: number): void {
   berm.material = material;
 }
 
+const sandSurfaceY = 0.02;
+const nestHeight = 0.1;
+const nestTop = sandSurfaceY + 0.03 + nestHeight;
+
 function addNest(scene: Scene): void {
-  const nest = MeshBuilder.CreateCylinder("nest", { diameter: 2.4, height: 0.08, tessellation: 20 }, scene);
-  nest.position.set(course.nest.x, 0.06, course.nest.z);
+  const nest = MeshBuilder.CreateCylinder("nest", { diameter: 2.4, height: nestHeight, tessellation: 20 }, scene);
+  nest.position.set(course.nest.x, nestTop - nestHeight / 2, course.nest.z);
   const sand = new StandardMaterial("nestMaterial", scene);
   sand.diffuseColor = new Color3(0.55, 0.4, 0.24);
   sand.specularColor = new Color3(0.03, 0.03, 0.03);
@@ -100,8 +106,61 @@ function addNest(scene: Scene): void {
   ];
   for (const [index, spot] of pebbleSpots.entries()) {
     const pebble = MeshBuilder.CreateSphere(`pebble${index}`, { diameter: 0.28, segments: 8 }, scene);
-    pebble.position.set(course.nest.x + spot.x, 0.16, course.nest.z + spot.z);
+    pebble.position.set(course.nest.x + spot.x, nestTop + 0.14, course.nest.z + spot.z);
     pebble.material = pebbleMaterial;
+  }
+}
+
+function addStartingGrid(scene: Scene): void {
+  const lineMaterial = new StandardMaterial("startLineMaterial", scene);
+  lineMaterial.diffuseColor = new Color3(0.95, 0.95, 0.92);
+  lineMaterial.specularColor = new Color3(0.05, 0.05, 0.05);
+  const line = MeshBuilder.CreateBox("startLine", { width: course.halfWidth * 2, height: 0.04, depth: 0.2 }, scene);
+  line.position.set(0, 0.08, course.nest.z - 1.7);
+  line.material = lineMaterial;
+
+  for (const spot of startingGrid) {
+    const onNest = spot.id === "center";
+    const height = onNest ? 0.045 : 0.07;
+    const base = onNest ? nestTop : sandSurfaceY;
+    const pad = MeshBuilder.CreateCylinder(
+      `startPad-${spot.id}`,
+      { diameter: onNest ? 1.7 : 1.45, height, tessellation: 20 },
+      scene,
+    );
+    pad.position.set(spot.x, base + 0.02 + height / 2, spot.z);
+    const material = new StandardMaterial(`startPadMaterial-${spot.id}`, scene);
+    material.diffuseColor = spot.id === "center" ? new Color3(0.93, 0.78, 0.38) : new Color3(0.62, 0.5, 0.32);
+    material.specularColor = new Color3(0.04, 0.04, 0.03);
+    pad.material = material;
+  }
+}
+
+/** A dashed center line and edge posts from the nest to the finish gate. */
+function addRoute(scene: Scene): void {
+  const dashMaterial = new StandardMaterial("routeDashMaterial", scene);
+  dashMaterial.diffuseColor = new Color3(0.96, 0.94, 0.84);
+  dashMaterial.specularColor = new Color3(0.04, 0.04, 0.03);
+  const postMaterial = new StandardMaterial("routePostMaterial", scene);
+  postMaterial.diffuseColor = new Color3(0.32, 0.42, 0.28);
+  postMaterial.specularColor = new Color3(0.03, 0.03, 0.03);
+
+  let dashIndex = 0;
+  for (let z = course.nest.z + 3; z < course.finish.minZ; z += 3) {
+    const dash = MeshBuilder.CreateBox(`routeDash${dashIndex}`, { width: 0.26, height: 0.035, depth: 0.85 }, scene);
+    dash.position.set(0, 0.09, z);
+    dash.material = dashMaterial;
+    dashIndex += 1;
+  }
+
+  let postIndex = 0;
+  for (let z = course.nest.z; z <= course.finish.minZ; z += 6) {
+    for (const x of [-(course.halfWidth - 1.15), course.halfWidth - 1.15]) {
+      const post = MeshBuilder.CreateCylinder(`routePost${postIndex}`, { diameter: 0.16, height: 0.42, tessellation: 8 }, scene);
+      post.position.set(x, 0.26, z);
+      post.material = postMaterial;
+      postIndex += 1;
+    }
   }
 }
 

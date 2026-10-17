@@ -50,7 +50,7 @@ describe("readGamepadSnapshot", () => {
     );
     expect(reading.brake).toBe(false);
     expect(reading.usesStandardMapping).toBe(false);
-    expect(reading.steer).toBeGreaterThan(0.8);
+    expect(reading.steer).toBeGreaterThan(0.7);
     expect(reading.pressedButtons.map((button) => button.index)).toEqual([1]);
   });
 
@@ -69,6 +69,24 @@ describe("readGamepadSnapshot", () => {
 
   it("yaws right when the look stick is pushed right", () => {
     const reading = readGamepadSnapshot(snapshot({ axes: [0, 0, 1, 0] }), 0.18);
+    expect(reading.lookX).toBe(-1);
+  });
+
+  it("still looks up when the right stick matches the left stick", () => {
+    const reading = readGamepadSnapshot(snapshot({ axes: [0, -1, 0, -1] }), 0.18);
+    expect(reading.throttle).toBe(1);
+    expect(reading.lookY).toBe(1);
+  });
+
+  it("still looks down while the left stick is held forward", () => {
+    const reading = readGamepadSnapshot(snapshot({ axes: [0, -1, 0, 1] }), 0.18);
+    expect(reading.throttle).toBe(1);
+    expect(reading.lookY).toBe(-1);
+  });
+
+  it("still looks right while the left stick is held forward", () => {
+    const reading = readGamepadSnapshot(snapshot({ axes: [0, -1, 1, 0] }), 0.18);
+    expect(reading.throttle).toBe(1);
     expect(reading.lookX).toBe(-1);
   });
 

@@ -13,6 +13,15 @@ export const course = {
   finish: { minZ: 36, maxZ: 44 },
 };
 
+/** Three pads at the nest. The player uses the center pad. */
+export const startingGrid = [
+  { id: "left", x: -3.2, z: course.nest.z },
+  { id: "center", x: course.nest.x, z: course.nest.z },
+  { id: "right", x: 3.2, z: course.nest.z },
+] as const;
+
+export const playerStart = startingGrid[1];
+
 export function surfaceAt(z: number): SurfaceProfile {
   if (z >= course.water.minZ) {
     return surfaces["shallow-water"];
