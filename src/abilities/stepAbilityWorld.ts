@@ -11,10 +11,11 @@ import {
   stepKnock,
   stepSeagull,
   strikeSeagull,
+  stunSeagull,
   type Seagull,
   type Vec2,
 } from "../mob/seagull";
-import { createSnap, stepSnap, trySnap, type SnapState } from "./snap";
+import { createSnap, snapRules, stepSnap, trySnap, type SnapState } from "./snap";
 import { createContactBook, resolveCollisions, stepContactBook, type ContactBook } from "./contacts";
 import { collectTideOrbs, createTideOrbs, stepTideOrbs, type TideOrb } from "./pickups";
 import { createSandCloud, ownCloudRemaining, resolveSandClouds, stepSandClouds, type SandCloud } from "./sandSpray";
@@ -105,6 +106,7 @@ export function stepAbilityWorld(world: AbilityWorld, tick: AbilityTick): Abilit
   let playerHealth = world.playerHealth;
   let rivalHealth = world.rivalHealth;
   let snap = world.snap;
+  let seagulls = world.seagulls;
   const frozen = world.seagulls.some((gull) => isRescuePhase(gull.phase));
 
   if (tick.racing && !frozen) {
@@ -138,7 +140,18 @@ export function stepAbilityWorld(world: AbilityWorld, tick: AbilityTick): Abilit
     rival = bite.target;
     rivalEffects = bite.targetEffects;
     rivalHealth = applyDamage(rivalHealth, bite.damage);
-    if (bite.hit) {
+    // The neck swivels, so any gull within reach gets bitten too, whether or not the rival was.
+    let gullBitten = false;
+    if (bite.started) {
+      seagulls = seagulls.map((gull) => {
+        if (Math.hypot(gull.x - player.x, gull.z - player.z) > snapRules.reach || isRescuePhase(gull.phase)) {
+          return gull;
+        }
+        gullBitten = true;
+        return stunSeagull(gull, player);
+      });
+    }
+    if (bite.hit || gullBitten) {
       cues.push("snap-hit");
     }
     if (bite.blocked) {
@@ -196,7 +209,6 @@ export function stepAbilityWorld(world: AbilityWorld, tick: AbilityTick): Abilit
     cues.push("bump");
   }
 
-  let seagulls = world.seagulls;
   let playerKnock = world.playerKnock;
   let playerShift: Vec2 = { x: 0, z: 0 };
   let playerLift = 0;
@@ -234,11 +246,17 @@ export function stepAbilityWorld(world: AbilityWorld, tick: AbilityTick): Abilit
     }
     const stillFrozen = seagulls.some((gull) => isRescuePhase(gull.phase));
     if (playerHealth.current <= 0 && !stillFrozen && seagulls.length > 0) {
-      const nearest = seagulls.reduce((best, gull) =>
-        Math.hypot(gull.x - player.x, gull.z - player.z) < Math.hypot(best.x - player.x, best.z - player.z) ? gull : best,
+      // A stunned gull cannot answer the call. If every gull is stunned the rescue waits for one to recover.
+      const able = seagulls.filter((gull) => gull.phase !== "stunned");
+      const nearest = able.reduce<Seagull | null>(
+        (best, gull) =>
+          !best || Math.hypot(gull.x - player.x, gull.z - player.z) < Math.hypot(best.x - player.x, best.z - player.z) ? gull : best,
+        null,
       );
-      seagulls = seagulls.map((gull) => (gull === nearest ? beginRescue(gull) : gull));
-      cues.push("gull-swoop");
+      if (nearest) {
+        seagulls = seagulls.map((gull) => (gull === nearest ? beginRescue(gull) : gull));
+        cues.push("gull-swoop");
+      }
     }
     if (!seagulls.some((gull) => isRescuePhase(gull.phase))) {
       const moved = stepKnock(playerKnock, tick.dt);

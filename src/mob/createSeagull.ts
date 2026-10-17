@@ -63,10 +63,11 @@ export function createSeagullMobs(scene: Scene, seagulls: readonly Seagull[]): S
         if (!gull) {
           return;
         }
-        const flapping = gull.y > 0.8;
+        const stunned = gull.phase === "stunned";
+        const flapping = gull.y > 0.8 && !stunned;
         rig.root.position.set(gull.x, gull.y + (flapping ? Math.sin(time * 14 + index) * 0.06 : 0), gull.z);
         rig.root.rotation.y = gull.heading + seagullModel.yawOffset;
-        rig.model.rotation.z = flapping ? Math.sin(time * 14 + index) * 0.1 : 0;
+        rig.model.rotation.z = stunned ? 0.9 + Math.sin(time * 30) * 0.05 : flapping ? Math.sin(time * 14 + index) * 0.1 : 0;
       });
     },
   };

@@ -11,8 +11,10 @@ import {
   isRescuePhase,
   seagullRules,
   stepKnock,
+  seagullSpawns,
   stepSeagull,
   strikeSeagull,
+  stunSeagull,
   type Seagull,
 } from "./seagull";
 
@@ -167,5 +169,71 @@ describe("seagull in the world", () => {
     const world = { ...createAbilityWorld(100), playerHealth: { current: 0, max: 100 } };
     const result = worldTick(world, createTurtleMotion());
     expect(result.rescuing).toBe(false);
+  });
+});
+
+describe("stunned seagull", () => {
+  const spawns = [{ id: "g", home }];
+
+  it("cannot attack while stunned, then goes back to chasing", () => {
+    const player = { x: 0, z: home.z - 0.5 };
+    const stunned = stunSeagull({ ...createSeagull("g", home), phase: "chase" }, player);
+    expect(stunned.phase).toBe("stunned");
+    expect(stepSeagull(stunned, { dt: frame, player, canAttack: true }).contact).toBe(false);
+    const mid = runGull(stunned, player, seagullRules.stunTime - 0.3);
+    expect(mid.phase).toBe("stunned");
+    expect(mid.y).toBeCloseTo(seagullRules.perchHeight, 1);
+    expect(runGull(stunned, player, seagullRules.stunTime + 0.1).phase).toBe("chase");
+  });
+
+  it("does not stun a gull that is carrying a turtle", () => {
+    const carrying = { ...createSeagull("g", home), phase: "carry" as const };
+    expect(stunSeagull(carrying, { x: 0, z: 0 }).phase).toBe("carry");
+  });
+
+  it("is stunned by a snap within reach, and ignored beyond it", () => {
+    const player = { ...createTurtleMotion(), x: 0, z: home.z - 1.5 };
+    const world = createAbilityWorld(115, spawns);
+    const far = createAbilityWorld(115, [{ id: "g", home: { x: 0, z: home.z + 20 } }]);
+    const bitten = worldTick(world, player, { snapPressed: true, canSnap: true });
+    expect(bitten.world.seagulls[0]!.phase).toBe("stunned");
+    expect(bitten.cues).toContain("snap-hit");
+    const missed = worldTick(far, player, { snapPressed: true, canSnap: true });
+    expect(missed.world.seagulls[0]!.phase).toBe("perched");
+    const unable = worldTick(createAbilityWorld(100, spawns), player, { snapPressed: true, canSnap: false });
+    expect(unable.world.seagulls[0]!.phase).not.toBe("stunned");
+  });
+
+  it("stops a stunned gull from attacking the player", () => {
+    const player = { ...createTurtleMotion(), x: home.x, z: home.z - 0.5 };
+    const world = createAbilityWorld(100, spawns);
+    world.seagulls[0] = stunSeagull({ ...world.seagulls[0]!, phase: "chase" }, player);
+    expect(worldTick(world, player).world.playerHealth.current).toBe(100);
+  });
+
+  it("waits for a recovered gull before carrying a turtle at zero health", () => {
+    const player = { ...createTurtleMotion(), x: home.x, z: home.z - 3 };
+    let world = createAbilityWorld(100, spawns);
+    world = { ...world, playerHealth: { current: 0, max: 100 } };
+    world.seagulls[0] = stunSeagull(world.seagulls[0]!, player);
+    let result = worldTick(world, player);
+    expect(result.rescuing).toBe(false);
+    let current = result.world;
+    for (let step = 0; step < 60 * (seagullRules.stunTime + 1); step += 1) {
+      result = worldTick(current, player);
+      current = result.world;
+      if (result.rescuing) break;
+    }
+    expect(result.rescuing).toBe(true);
+  });
+
+  it("puts several gulls along the course, apart from each other", () => {
+    expect(seagullSpawns.length).toBeGreaterThanOrEqual(3);
+    expect(new Set(seagullSpawns.map((spawn) => spawn.id)).size).toBe(seagullSpawns.length);
+    for (const a of seagullSpawns) {
+      for (const b of seagullSpawns) {
+        if (a !== b) expect(Math.hypot(a.home.x - b.home.x, a.home.z - b.home.z)).toBeGreaterThan(8);
+      }
+    }
   });
 });

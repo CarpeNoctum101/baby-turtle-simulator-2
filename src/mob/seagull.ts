@@ -20,6 +20,8 @@ export const seagullRules = {
   knockDecay: 4.5,
   /** After a strike the gull is dazed for this long before it chases again. */
   recoverTime: 1.3,
+  /** How long a snap leaves a gull flat on the sand, unable to attack. */
+  stunTime: 2.5,
   perchHeight: 0.56,
   flyHeight: 1.1,
   /** Rescue (carry) tuning. */
@@ -41,7 +43,7 @@ export const seagullRules = {
   nestLimitZ: -30,
 } as const;
 
-export type SeagullPhase = "perched" | "chase" | "recover" | "swoop" | "grab" | "carry" | "drop" | "return";
+export type SeagullPhase = "perched" | "chase" | "recover" | "stunned" | "swoop" | "grab" | "carry" | "drop" | "return";
 
 export interface Vec2 {
   x: number;
@@ -82,8 +84,13 @@ export function createSeagull(id: string, home: Vec2): Seagull {
   };
 }
 
-/** Where the game puts seagulls. One guards the dry sand just past the nest. */
-export const seagullSpawns: readonly { id: string; home: Vec2 }[] = [{ id: "gull-1", home: { x: 2.5, z: 4 } }];
+/** Where the game puts seagulls: two on the dry sand, one on the wet sand, one near the shore. */
+export const seagullSpawns: readonly { id: string; home: Vec2 }[] = [
+  { id: "gull-1", home: { x: -5, z: -8 } },
+  { id: "gull-2", home: { x: 2.5, z: 4 } },
+  { id: "gull-3", home: { x: -4, z: 18 } },
+  { id: "gull-4", home: { x: 4, z: 30 } },
+];
 
 export function isRescuePhase(phase: SeagullPhase): boolean {
   return phase === "swoop" || phase === "grab" || phase === "carry" || phase === "drop";
@@ -133,6 +140,16 @@ export function strikeSeagull(gull: Seagull, player: Vec2): Seagull {
     phaseTime: 0,
     knock: { x: away.x * seagullRules.gullKnockSpeed, z: away.z * seagullRules.gullKnockSpeed },
   };
+}
+
+/** A snap lands: the gull drops to the sand, gets pushed back a little, and cannot attack until it recovers. */
+export function stunSeagull(gull: Seagull, from: Vec2): Seagull {
+  if (isRescuePhase(gull.phase)) {
+    return gull;
+  }
+  const away = unit(gull.x - from.x, gull.z - from.z, Math.sin(gull.heading + Math.PI), Math.cos(gull.heading + Math.PI));
+  const push = seagullRules.gullKnockSpeed * 0.6;
+  return { ...gull, phase: "stunned", phaseTime: 0, knock: { x: away.x * push, z: away.z * push } };
 }
 
 /** The push the turtle receives when the gull strikes it, pointing from the gull through the turtle. */
@@ -187,6 +204,13 @@ export function stepSeagull(gull: Seagull, input: SeagullInput): SeagullStep {
     case "recover": {
       next = { ...next, y: approach(next.y, seagullRules.flyHeight + 0.4, 3 * dt) };
       if (next.phaseTime >= seagullRules.recoverTime) {
+        next = { ...next, phase: "chase", phaseTime: 0 };
+      }
+      break;
+    }
+    case "stunned": {
+      next = { ...next, y: approach(next.y, seagullRules.perchHeight, 3 * dt) };
+      if (next.phaseTime >= seagullRules.stunTime) {
         next = { ...next, phase: "chase", phaseTime: 0 };
       }
       break;
