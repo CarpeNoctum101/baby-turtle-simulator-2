@@ -1,17 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { createTurtleMotion } from "../movement/stepTurtle";
+import { course } from "../movement/course";
 import { createEndingState, endingPlan, sampleEnding, stepEnding } from "./endingState";
 
 describe("automatic Starship ending", () => {
-  it.each([-7.3, 0, 7.3])("walks from finish x=%s to the hatch and reaches space without input", x => {
-    let state = createEndingState({ ...createTurtleMotion(), x, z: 36.1, heading: 1.2 });
+  it.each([-(course.halfWidth - 0.7), 0, course.halfWidth - 0.7])("walks from finish x=%s to the hatch and reaches space without input", x => {
+    let state = createEndingState({ ...createTurtleMotion(), x, z: course.finish.minZ, heading: 1.2 });
     const phases = new Set<string>();
     let lastAltitude = 0;
+    let previousZ = state.start.z;
     for (let i = 0; i < 40 * 60; i++) {
       const frame = sampleEnding(state);
       phases.add(frame.phase);
       expect(Number.isFinite(frame.turtle.x + frame.turtle.y + frame.turtle.z + frame.heading)).toBe(true);
       expect(frame.altitude).toBeGreaterThanOrEqual(lastAltitude);
+      expect(frame.turtle.z).toBeGreaterThanOrEqual(previousZ);
       if (frame.phase === "boarding") {
         expect(frame.turtle.x).toBe(0);
         expect(frame.turtle.y).toBe(endingPlan.hatch.y);
@@ -19,6 +22,7 @@ describe("automatic Starship ending", () => {
       }
       if (frame.phase === "launch" || frame.phase === "space") expect(frame.boarded).toBe(true);
       lastAltitude = frame.altitude;
+      previousZ = frame.turtle.z;
       state = stepEnding(state, 1 / 60);
     }
     expect([...phases]).toEqual(["rising", "walking", "boarding", "countdown", "launch", "space"]);
@@ -26,7 +30,7 @@ describe("automatic Starship ending", () => {
   });
 
   it("waits at the finish until the submerged pad and bridge have risen completely", () => {
-    const state = createEndingState({ ...createTurtleMotion(), x: 7.3, z: 36.1, heading: 0.3 });
+    const state = createEndingState({ ...createTurtleMotion(), x: course.halfWidth - 0.7, z: course.finish.minZ, heading: 0.3 });
     let previousOffset = -endingPlan.submergedDepth;
     for (let elapsed = 0; elapsed < endingPlan.riseSeconds; elapsed += 1 / 60) {
       const frame = sampleEnding({ ...state, elapsed });
@@ -51,7 +55,7 @@ describe("automatic Starship ending", () => {
   });
 
   it("is repeatable on restart and guards against invalid or very large frame times", () => {
-    const motion = { ...createTurtleMotion(), x: 3, z: 36.2 };
+    const motion = { ...createTurtleMotion(), x: 3, z: course.finish.minZ };
     const initial = createEndingState(motion);
     expect(stepEnding(initial, -1)).toEqual(initial);
     expect(stepEnding(initial, NaN)).toEqual(initial);
@@ -61,7 +65,7 @@ describe("automatic Starship ending", () => {
   });
 
   it("has a continuous ramp and liftoff transition", () => {
-    const state = createEndingState({ ...createTurtleMotion(), z: 36 });
+    const state = createEndingState({ ...createTurtleMotion(), z: course.finish.minZ });
     let previous = sampleEnding(state);
     for (let elapsed = 1 / 60; elapsed < 35; elapsed += 1 / 60) {
       const frame = sampleEnding({ ...state, elapsed });

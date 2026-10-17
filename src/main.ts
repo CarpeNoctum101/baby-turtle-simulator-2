@@ -62,17 +62,13 @@ if (!canvas || !ui) {
 }
 
 try {
-<<<<<<< HEAD
-  const game = startGame(canvas, ui);
-=======
   const beachPreview = new URLSearchParams(window.location.search).get("beachPreview") === "1";
   const previewLink = document.querySelector<HTMLAnchorElement>("#beachPreviewLink");
   if (beachPreview && previewLink) {
     previewLink.textContent = "Beach study · Back to course";
     previewLink.href = "?";
   }
-  const game = startGame(canvas, hud, hudToggle, beachPreview);
->>>>>>> graphics
+  const game = startGame(canvas, ui, beachPreview);
 
   if (import.meta.hot) {
     import.meta.hot.dispose(() => {

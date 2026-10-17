@@ -53,7 +53,6 @@ body {
   white-space: pre-wrap;
 }
 
-<<<<<<< HEAD
 .overlay {
   position: absolute;
   inset: 0;
@@ -246,7 +245,6 @@ body {
 #abilityHud[data-tone="trail"] #abilityMeterFill {
   background: #d7c4ff;
 }
-=======
 #beachPreviewLink {
   position: absolute;
   right: 16px;
@@ -288,4 +286,5 @@ body {
 body:has(.ending-overlay:not([hidden])) #beachPreviewLink,
 body:has(.ending-overlay:not([hidden])) #hudToggle,
 body:has(.ending-overlay:not([hidden])) #hud { display: none; }
->>>>>>> graphics
+body:has(#results:not([hidden])) .ending-overlay { display: none; }
+body:has(.overlay:not([hidden])) #beachPreviewLink { display: none; }

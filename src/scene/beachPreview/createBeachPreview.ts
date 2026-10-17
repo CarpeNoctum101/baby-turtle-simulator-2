@@ -17,6 +17,7 @@ import { createAtmosphere } from "./createAtmosphere";
 import { createOcean } from "./createOcean";
 import { createBeachLand } from "./createBeachLand";
 import { beachHeight, seededRandom } from "./landscape";
+import { course } from "../../movement/course";
 
 /** A visual study isolated from the unchanged race prototype and movement rules. */
 export function createBeachPreview(scene: Scene, sun: DirectionalLight, fill: HemisphericLight): void {
@@ -47,12 +48,13 @@ export function createBeachPreview(scene: Scene, sun: DirectionalLight, fill: He
   createBeachLand(scene);
   createOcean(scene, sunDirection);
 
-  const palm = createPalm(scene, new Vector3(-9.4, beachHeight(-9.4, -10), -10));
+  const palmX = -course.halfWidth - 1.4;
+  const palm = createPalm(scene, new Vector3(palmX, beachHeight(palmX, -10), -10));
   for (const [i, spot] of [
-    { x: 12.8, z: -6, scale: 1.12, yaw: 1.5 },
-    { x: -15, z: 3, scale: 0.92, yaw: -0.7 },
-    { x: -18, z: -24, scale: 1.18, yaw: 0.8 },
-    { x: 17, z: 9, scale: 0.9, yaw: 2.7 },
+    { x: course.halfWidth+4.8, z: -6, scale: 1.12, yaw: 1.5 },
+    { x: -course.halfWidth-7, z: 3, scale: 0.92, yaw: -0.7 },
+    { x: -course.halfWidth-10, z: -24, scale: 1.18, yaw: 0.8 },
+    { x: course.halfWidth+9, z: 9, scale: 0.9, yaw: 2.7 },
   ].entries()) {
     const root = new TransformNode(`previewPalmInstance${i}`, scene);
     root.position.set(spot.x, beachHeight(spot.x, spot.z), spot.z);
@@ -118,10 +120,11 @@ function createGrass(scene: Scene): void {
   if (!grass) return;
   grass.name = "previewGrassSource";
   grass.material = material;
-  grass.position.set(-9.8, beachHeight(-9.8,-10.3), -10.3);
+  const grassX = -course.halfWidth - 1.8;
+  grass.position.set(grassX, beachHeight(grassX,-10.3), -10.3);
   const random = seededRandom(912);
   for (let i = 0; i < 50; i++) {
-    const x = (i % 2 ? -1 : 1) * (8.5 + random() * 12), z = -36 + random() * 45;
+    const x = (i % 2 ? -1 : 1) * (course.halfWidth + 0.5 + random() * 12), z = -36 + random() * 45;
     const tuft = grass.createInstance(`previewGrass${i}`);
     tuft.position.set(x, beachHeight(x,z), z);
     tuft.scaling.setAll(0.7 + random() * 1.4);

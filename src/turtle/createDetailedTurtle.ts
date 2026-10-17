@@ -90,7 +90,7 @@ export function createDetailedTurtle(scene: Scene): PlaceholderTurtle {
       flippers.push({ mesh:flipper,baseY:flipper.rotation.y,baseZ:flipper.rotation.z,side,role });
     }
   }
-  return {root,visual,flippers};
+  return {root,visual,flippers,skin,shell};
 }
 
 function organicMaterial(scene: Scene, kind: "shell" | "skin"): PBRMaterial {

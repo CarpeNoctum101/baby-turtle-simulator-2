@@ -3,30 +3,31 @@ import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import type { Scene } from "@babylonjs/core/scene";
 import { skyGLSL } from "./createAtmosphere";
+import { course } from "../../movement/course";
 
 /** One opaque water surface: animated wave normals, sky reflection, sun glitter and shore foam. */
 export function createOcean(scene: Scene, sunDirection: Vector3): void {
   const ocean = MeshBuilder.CreateGround("previewOcean", { width: 600, height: 600, subdivisions: 96 }, scene);
-  ocean.position.set(0, 0.04, 312.5);
+  ocean.position.set(0, 0.04, 300 + course.water.minZ - 1.5);
   ocean.isPickable = false;
   const material = new ShaderMaterial("previewLivingOcean", scene, {
     vertexSource: `precision highp float;
-      attribute vec3 position; uniform mat4 world, worldViewProjection; uniform float time;
+      attribute vec3 position; uniform mat4 world, worldViewProjection; uniform float time, shoreZ;
       varying vec3 worldPosition;
       void main() {
         vec3 p=position;
         vec3 w=(world*vec4(p,1.0)).xyz;
-        p.y += (sin(w.z*0.48-time*0.8)*0.045 + sin(w.x*0.29+w.z*0.22-time*0.6)*0.035)*smoothstep(17.0,30.0,w.z);
+        p.y += (sin(w.z*0.48-time*0.8)*0.045 + sin(w.x*0.29+w.z*0.22-time*0.6)*0.035)*smoothstep(shoreZ+3.0,shoreZ+16.0,w.z);
         worldPosition=(world*vec4(p,1.0)).xyz;
         gl_Position=worldViewProjection*vec4(p,1.0);
       }`,
     fragmentSource: `precision highp float;
       varying vec3 worldPosition;
-      uniform float time; uniform vec3 cameraPosition, sunDirection;
+      uniform float time, shoreZ; uniform vec3 cameraPosition, sunDirection;
       ${skyGLSL}
       void main() {
         vec2 p=worldPosition.xz;
-        float shore=14.0+sin(p.x*0.18)*0.22+sin(p.x*0.51)*0.08;
+        float shore=shoreZ+sin(p.x*0.18)*0.22+sin(p.x*0.51)*0.08;
         float depth=p.y-shore;
         if (depth<0.0) discard;
         float fine=fbm(p*2.1+vec2(time*0.12,-time*0.16));
@@ -52,9 +53,10 @@ export function createOcean(scene: Scene, sunDirection: Vector3): void {
         color=mix(color,vec3(0.79,0.77,0.66),haze);
         gl_FragColor=vec4(color,1.0);
       }`,
-  }, { attributes: ["position"], uniforms: ["world", "worldViewProjection", "time", "cameraPosition", "sunDirection"] });
+  }, { attributes: ["position"], uniforms: ["world", "worldViewProjection", "time", "shoreZ", "cameraPosition", "sunDirection"] });
   material.setVector3("sunDirection", sunDirection);
   material.setFloat("time", 0);
+  material.setFloat("shoreZ", course.water.minZ);
   material.setVector3("cameraPosition", Vector3.Zero());
   ocean.material = material;
   let time = 0;

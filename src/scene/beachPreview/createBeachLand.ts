@@ -10,21 +10,24 @@ import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import type { Scene } from "@babylonjs/core/scene";
 import { applySandUVs, createSandMaterials } from "./createSandMaterials";
 import { beachHeight, seededRandom, smoothstep } from "./landscape";
+import { course } from "../../movement/course";
 
 export function createBeachLand(scene: Scene): void {
   const sand = createSandMaterials(scene);
-  const ground = MeshBuilder.CreateGround("previewNaturalBeach", { width: 120, height: 100, subdivisions: 128 }, scene);
-  ground.position.z = -34;
+  const backZ = -84, frontZ = course.water.minZ + 2;
+  const depth = frontZ - backZ;
+  const ground = MeshBuilder.CreateGround("previewNaturalBeach", { width: 120, height: depth, subdivisions: 128 }, scene);
+  ground.position.z = (backZ + frontZ) / 2;
   const positions = ground.getVerticesData(VertexBuffer.PositionKind)!;
   const colors: number[] = [], detailUVs: number[] = [];
   for (let i = 0; i < positions.length; i += 3) {
-    const x = positions[i], z = positions[i + 2] - 34;
+    const x = positions[i], z = positions[i + 2] + ground.position.z;
     positions[i + 1] = beachHeight(x, z);
-    const wetness = smoothstep(-7, -3.5, z + Math.sin(x * 0.21) * 0.5);
+    const wetness = smoothstep(course.wet.minZ, course.wet.minZ + 3.5, z + Math.sin(x * 0.21) * 0.5);
     const color = Color3.Lerp(sand.dryColor, sand.wetColor, wetness);
     const variation = 0.95 + Math.sin(x * 0.55 + z * 0.7) * Math.sin(z * 0.36 - x * 0.3) * 0.045;
     colors.push(color.r * variation, color.g * variation, color.b * variation, 1);
-    detailUVs.push(x / 120 + 0.5, (z + 84) / 100);
+    detailUVs.push(x / 120 + 0.5, (z - backZ) / depth);
   }
   ground.setVerticesData(VertexBuffer.PositionKind, positions);
   const normals: number[] = [];
@@ -39,8 +42,9 @@ export function createBeachLand(scene: Scene): void {
 
   const roughness = new Uint8Array(128 * 128 * 3);
   for (let y = 0; y < 128; y++) {
-    const z = (y + 0.5) / 128 * 100 - 84;
-    const value = 0.96 - smoothstep(-7, -3.5, z) * 0.42 - smoothstep(5, 14, z) * 0.28;
+    const z = (y + 0.5) / 128 * depth + backZ;
+    const value = 0.96 - smoothstep(course.wet.minZ, course.wet.minZ + 3.5, z) * 0.42
+      - smoothstep(course.water.minZ - 9, course.water.minZ, z) * 0.28;
     for (let x = 0; x < 128; x++) roughness.set([255, value * 255, 0], (y * 128 + x) * 3);
   }
   const map = RawTexture.CreateRGBTexture(roughness, 128, 128, scene, true, false);
@@ -80,7 +84,7 @@ function addShoreDetails(scene: Scene): void {
   for (let i = 0; i < 68; i++) {
     const rock = stone.createInstance(`previewRock${i}`);
     const side = i % 2 ? 1 : -1;
-    const x = side * (8.4 + random() * 11), z = -31 + random() * 43;
+    const x = side * (course.halfWidth + 0.4 + random() * 11), z = -31 + random() * 43;
     const size = 0.12 + random() ** 2 * 1.5;
     rock.position.set(x, beachHeight(x, z) + size * 0.08, z);
     rock.scaling.set(size * 1.3, size * 0.65, size);
@@ -94,7 +98,7 @@ function addShoreDetails(scene: Scene): void {
   const branches: Mesh[] = [];
   for (let i = 0; i < 11; i++) {
     const side = i % 2 ? -1 : 1;
-    const x = side * (8.8 + random() * 4), z = -25 + random() * 33;
+    const x = side * (course.halfWidth + 0.8 + random() * 4), z = -25 + random() * 33;
     const base = new Vector3(x, beachHeight(x, z) + 0.08, z);
     const length = 0.5 + random() * 1.4;
     const angle = random() * Math.PI * 2;

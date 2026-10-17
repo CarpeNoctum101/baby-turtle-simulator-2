@@ -17,14 +17,18 @@ Open http://127.0.0.1:5173/ for the existing course. Open
 http://127.0.0.1:5173/?beachPreview=1 (or select **Explore the beach preview**)
 for the tropical beach asset study. Both use the same movement and finish logic.
 
-- W / Up: crawl forward. S / Down: reverse. A / D or Left / Right: steer.
-- Space: brake. R: reset to the nest. H: show or hide the readout.
-- Click and move the mouse, or drag, to look around. Escape releases mouse capture.
+- Select **Start race** or press Enter for a three-second countdown.
+- W / Up: crawl in the camera's direction. S / Down: move the opposite way.
+  A / D or Left / Right: move sideways relative to the camera.
+- Space: brake. X: use the stored Tide Orb ability. R: restart at the nest with a new countdown.
+  H: show or hide the readout.
+- Hold the right mouse button and drag to look around; the camera stays still while you crawl.
 - Scroll to zoom. The beach preview starts facing the palms with the readout hidden;
   use H or **Show readout** for controls/status. The cinematic takes over at the finish.
 - Xbox-compatible gamepad mapping remains available; press a controller button to expose it to the browser.
 
-The preview contains natural dunes, five palms sharing geometry/materials, dune grass,
+Both course views include the start screen, race timer, local practice rival, Tide Orbs,
+ability HUD and rematch. The preview contains natural dunes, five palms sharing geometry/materials, dune grass,
 weathered stones and driftwood, fine sand and reflective wet sand. A procedural sky
 adds clouds and a sunrise; the ocean has animated waves, shoreline foam, reflected
 sky and sunlight. The preview turtle has a patterned shell, scaled skin and tapered
@@ -49,6 +53,8 @@ Race through the pale gate in the ocean, then release the controls. In both cour
 
 Movement, braking and look input do not drive the cinematic. **R** restarts from any
 stage, including orbit, restoring the beach, turtle, normal camera and lighting.
+The result screen appears after reaching space. Select **Rematch** or press Enter
+to start the countdown again.
 The sequence takes roughly 27 seconds after the finish and needs no further input.
 There are no action descriptions or story captions; only the numeric countdown and
 a small restart hint remain on screen.
@@ -59,12 +65,10 @@ artwork. There are no additional dependencies, downloaded models or paid service
 
 ## Milestones
 
-The current prototype has scene/input/movement/finish detection (milestones 1–3).
-Race flow and Tide Orb pickups (4), then initial abilities (5), remain the next
-gameplay milestones. The optional beach study previews environment assets without
-marking milestones 6 or 8 complete or replacing the default course.
-The scripted Starship celebration is implemented, while the full race flow, pickups
-and abilities remain separate work.
+The merged prototype includes scene/input/movement/finish detection, local race flow,
+Tide Orb pickups and ability implementations. The optional beach study previews
+environment assets without marking the complete visual or performance milestones
+finished. Multiplayer and deployment remain separate work; the rival is local.
 
 ## Automated checks and production preview
 

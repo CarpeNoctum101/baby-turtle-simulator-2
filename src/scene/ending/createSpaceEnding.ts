@@ -6,6 +6,7 @@ import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator"
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import type { Scene } from "@babylonjs/core/scene";
 import { endingPlan, type EndingFrame } from "../../game/endingState";
+import { course } from "../../movement/course";
 import type { PlaceholderTurtle } from "../../turtle/createPlaceholderTurtle";
 import { createStarship } from "./createStarship";
 import { createOrbitalBackdrop } from "./createOrbitalBackdrop";
@@ -20,7 +21,7 @@ export function createSpaceEnding(scene: Scene, turtle: PlaceholderTurtle) {
   const backdrop=createOrbitalBackdrop(scene,sun.direction.negate().normalize());
   // The high camera needs a longer horizon than the low-angle racing camera.
   const sea=MeshBuilder.CreateGround("endingOceanHorizon",{width:6000,height:6000,subdivisions:96},scene);
-  sea.position.set(0,0.04,3012.5);
+  sea.position.set(0,0.04,3000+course.water.minZ-1.5);
   sea.material=scene.getMaterialByName("previewLivingOcean") ?? scene.getMaterialByName("shallowWaterMaterial");
   sea.isPickable=false;
   sea.setEnabled(false);
@@ -37,7 +38,9 @@ export function createSpaceEnding(scene: Scene, turtle: PlaceholderTurtle) {
   restart.className="ending-restart";restart.textContent="R · Race again";
   overlay.append(count,restart);
   scene.getEngine().getRenderingCanvas()?.parentElement?.appendChild(overlay);
-  const target=new Vector3(0,5,48);
+  const target=new Vector3(0,5,endingPlan.ship.z-6);
+  const boardingTarget=new Vector3(0,2.6,endingPlan.hatch.z-0.05);
+  const boardingPosition=new Vector3(5,5.3,endingPlan.rampFoot.z-1.5);
   let active=false;
   let hiddenBeach=false;
   let meshStates:boolean[]=[];
@@ -129,7 +132,7 @@ export function createSpaceEnding(scene: Scene, turtle: PlaceholderTurtle) {
         if(!visible)continue;
         const cycle=(time*0.33+i/18)%1,angle=i*2.399963;
         const radius=1+cycle*10;
-        puff.position.set(Math.cos(angle)*radius,0.4+cycle*1.5,54+Math.sin(angle)*radius);
+        puff.position.set(Math.cos(angle)*radius,0.4+cycle*1.5,endingPlan.ship.z+Math.sin(angle)*radius);
         puff.scaling.setAll((0.5+cycle*4)*ignition);
         puff.visibility=(1-cycle)*0.75;
       }
@@ -152,17 +155,17 @@ export function createSpaceEnding(scene: Scene, turtle: PlaceholderTurtle) {
       let desiredPosition=shipTarget.add(new Vector3(19,7,-distance));
       if(frame.phase==="rising") {
         // Frame the surface and the entire emerging rocket, rather than tracking it underwater.
-        desiredTarget=new Vector3(0,4.5,48);
+        desiredTarget=new Vector3(0,4.5,endingPlan.ship.z-6);
         desiredPosition=desiredTarget.add(new Vector3(19,9,-distance));
       } else if(frame.phase==="walking") {
         desiredTarget=Vector3.Lerp(new Vector3(frame.turtle.x,frame.turtle.y,frame.turtle.z),shipTarget,0.65);
         desiredPosition=desiredTarget.add(new Vector3(16,8,-distance));
         const close=Math.max(0,(frame.walkProgress-0.75)/0.25);
-        desiredTarget=Vector3.Lerp(desiredTarget,new Vector3(0,2.8,52.5),close);
-        desiredPosition=Vector3.Lerp(desiredPosition,new Vector3(5,5.3,43.5),close);
+        desiredTarget=Vector3.Lerp(desiredTarget,boardingTarget,close);
+        desiredPosition=Vector3.Lerp(desiredPosition,boardingPosition,close);
       } else if(frame.phase==="boarding") {
-        desiredTarget=new Vector3(0,2.6,52.5);
-        desiredPosition=new Vector3(5,5.3,43.5);
+        desiredTarget=boardingTarget;
+        desiredPosition=boardingPosition;
       } else if(frame.phase==="space") {
         const angle=0.55+Math.sin(frame.phaseTime*0.12)*0.22;
         desiredPosition=shipTarget.add(new Vector3(Math.sin(angle)*distance,8,-Math.cos(angle)*distance));

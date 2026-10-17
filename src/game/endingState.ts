@@ -1,4 +1,5 @@
 import type { TurtleMotion } from "../movement/stepTurtle";
+import { course } from "../movement/course";
 
 export type EndingPhase = "rising" | "walking" | "boarding" | "countdown" | "launch" | "space";
 export interface Position3 { x: number; y: number; z: number }
@@ -23,12 +24,15 @@ export interface EndingFrame {
 }
 
 // Shared by the route and the 3D dock, so the turtle really follows the boarding ramp.
+const finishZ = course.finish.minZ;
 export const endingPlan = {
-  ship: { x: 0, y: 0.24, z: 54 },
-  entry: { x: 0, y: 0.2, z: 42 },
-  rampFoot: { x: 0, y: 0.2, z: 45 },
-  hatch: { x: 0, y: 1.8, z: 52.55 },
-  cabin: { x: 0, y: 1.8, z: 54 },
+  arrivalZ: finishZ,
+  arrivalHalfWidth: course.halfWidth + 0.5,
+  ship: { x: 0, y: 0.24, z: finishZ + 18 },
+  entry: { x: 0, y: 0.2, z: finishZ + 6 },
+  rampFoot: { x: 0, y: 0.2, z: finishZ + 9 },
+  hatch: { x: 0, y: 1.8, z: finishZ + 16.55 },
+  cabin: { x: 0, y: 1.8, z: finishZ + 18 },
   riseSeconds: 4.8,
   submergedDepth: 18,
   walkingSpeed: 2.6,
@@ -41,7 +45,7 @@ export const endingPlan = {
 export function createEndingState(motion: TurtleMotion): EndingState {
   return {
     elapsed: 0,
-    start: { x: motion.x, y: 0.2 * clamp01((motion.z - 36) / 6), z: motion.z },
+    start: { x: motion.x, y: 0.2 * clamp01((motion.z - finishZ) / 6), z: motion.z },
     startHeading: motion.heading,
   };
 }

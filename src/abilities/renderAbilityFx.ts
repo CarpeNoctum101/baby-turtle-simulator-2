@@ -11,6 +11,7 @@ import { tideOrbSpots, type TideOrb } from "./pickups";
 import { sandCloudAnchor, type SandCloud } from "./sandSpray";
 import { oceanTrail } from "./trail";
 import { course, waveZone } from "../movement/course";
+import type { PlaceholderTurtle } from "../turtle/createPlaceholderTurtle";
 
 export interface AbilityFxFrame {
   time: number;
@@ -24,10 +25,10 @@ export interface AbilityFxFrame {
   trail: boolean;
   waveArmed: boolean;
   waveBoost: boolean;
-  playerSkin: StandardMaterial;
-  playerShell: StandardMaterial;
-  rivalSkin: StandardMaterial;
-  rivalShell: StandardMaterial;
+  playerSkin: PlaceholderTurtle["skin"];
+  playerShell: PlaceholderTurtle["shell"];
+  rivalSkin: PlaceholderTurtle["skin"];
+  rivalShell: PlaceholderTurtle["shell"];
 }
 
 export interface AbilityFx {
@@ -197,8 +198,8 @@ function createDebris(scene: Scene): void {
 }
 
 function paintTurtle(
-  skin: StandardMaterial,
-  shell: StandardMaterial,
+  skin: PlaceholderTurtle["skin"],
+  shell: PlaceholderTurtle["shell"],
   frenzy: boolean,
   shield: boolean,
   time: number,

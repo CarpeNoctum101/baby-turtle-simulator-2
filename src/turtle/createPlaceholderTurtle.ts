@@ -1,4 +1,5 @@
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import type { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
@@ -17,8 +18,8 @@ export interface PlaceholderTurtle {
   /** Bobs and rolls without moving the logical position. */
   visual: TransformNode;
   flippers: FlipperRig[];
-  skin: StandardMaterial;
-  shell: StandardMaterial;
+  skin: StandardMaterial | PBRMaterial;
+  shell: StandardMaterial | PBRMaterial;
 }
 
 /**

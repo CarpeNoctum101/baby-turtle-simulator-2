@@ -13,6 +13,9 @@ import { endingPlan } from "../../game/endingState";
 /** Original stylized Starship artwork, including a fictional turtle boarding hatch. */
 export function createStarship(scene: Scene) {
   const root = new TransformNode("endingLaunchSet", scene);
+  const shipZ = endingPlan.ship.z;
+  const rampZ = endingPlan.rampFoot.z;
+  const hatchZ = endingPlan.hatch.z;
   // One lift carries the rocket, launch pad and connected boarding bridge out of the sea.
   const lift = new TransformNode("starshipSeaLift", scene);
   lift.parent = root;
@@ -85,13 +88,14 @@ export function createStarship(scene: Scene) {
   addWordmark();
 
   const pad=MeshBuilder.CreateCylinder("starshipOceanLaunchPad", { diameter:12,height:1.2,tessellation:64 },scene);
-  pad.position.set(0,-0.36,54);
+  pad.position.set(0,-0.36,shipZ);
   attach(pad,lift,deck);
-  const padCircle=MeshBuilder.CreateTube("starshipPadCircle", { path:Array.from({length:65},(_,i)=>new Vector3(Math.cos(i/64*Math.PI*2)*5.1,0.25,54+Math.sin(i/64*Math.PI*2)*5.1)),radius:0.06,tessellation:4 },scene);
+  const padCircle=MeshBuilder.CreateTube("starshipPadCircle", { path:Array.from({length:65},(_,i)=>new Vector3(Math.cos(i/64*Math.PI*2)*5.1,0.25,shipZ+Math.sin(i/64*Math.PI*2)*5.1)),radius:0.06,tessellation:4 },scene);
   attach(padCircle,lift,white);
   const walkwayEdges=[-1,1].map(side=>[
-    new Vector3(side*9,0.04,35),new Vector3(side*9,0.04,36),
-    new Vector3(side*3,0.24,42),new Vector3(side*1.8,0.24,45),
+    new Vector3(side*endingPlan.arrivalHalfWidth,0.04,endingPlan.arrivalZ-1),
+    new Vector3(side*endingPlan.arrivalHalfWidth,0.04,endingPlan.arrivalZ),
+    new Vector3(side*3,0.24,endingPlan.entry.z),new Vector3(side*1.8,0.24,rampZ),
   ]);
   const walkway=MeshBuilder.CreateRibbon("starshipArrivalWalkway", { pathArray:walkwayEdges,
     sideOrientation:Mesh.DOUBLESIDE },scene);
@@ -106,7 +110,7 @@ export function createStarship(scene: Scene) {
   }
   // Submerged support legs make the rising platform read as a solid structure.
   const supports:Mesh[]=[];
-  for(const x of [-3.5,3.5])for(const z of [51,57]) {
+  for(const x of [-3.5,3.5])for(const z of [shipZ-3,shipZ+3]) {
     const support=MeshBuilder.CreateCylinder("starshipLiftSupport",{height:7,diameter:0.65,tessellation:12},scene);
     support.position.set(x,-4.2,z);
     supports.push(support);
@@ -114,12 +118,12 @@ export function createStarship(scene: Scene) {
   const legs=Mesh.MergeMeshes(supports,true,false);
   if(legs)attach(legs,lift,steel);
   const ramp=MeshBuilder.CreateRibbon("starshipBoardingRamp", { pathArray:[-1.13,1.13].map(x=>[
-    new Vector3(x,0.24,45),new Vector3(x,1.84,52.55),
+    new Vector3(x,0.24,rampZ),new Vector3(x,1.84,hatchZ),
   ]),sideOrientation:Mesh.DOUBLESIDE },scene);
   attach(ramp,lift,deck);
   const railMeshes: Mesh[]=[];
   for (const side of [-1,1]) {
-    const start=new Vector3(side*1.13,1.05,45),end=new Vector3(side*1.13,2.65,52.55);
+    const start=new Vector3(side*1.13,1.05,rampZ),end=new Vector3(side*1.13,2.65,hatchZ);
     railMeshes.push(MeshBuilder.CreateTube("rampRail",{path:[start,end],radius:0.035,tessellation:6},scene));
     for(let i=0;i<=5;i++) {
       const p=Vector3.Lerp(start,end,i/5);
@@ -136,7 +140,7 @@ export function createStarship(scene: Scene) {
   foam.alpha=0.55;
   const ripples=Array.from({length:3},(_,i)=>{
     const ring=MeshBuilder.CreateTorus(`starshipSeaRipple${i}`,{diameter:12,thickness:0.07,tessellation:64},scene);
-    ring.position.set(0,0.12+i*0.015,54);
+    ring.position.set(0,0.12+i*0.015,shipZ);
     attach(ring,root,foam);
     ring.setEnabled(false);
     return ring;
@@ -166,7 +170,7 @@ export function createStarship(scene: Scene) {
   glow.diffuse=new Color3(0.4,0.62,1);
   glow.range=16;
   glow.intensity=0;
-  const dockLight=new PointLight("starshipDockFloodlight",new Vector3(-5,9,45),scene);
+  const dockLight=new PointLight("starshipDockFloodlight",new Vector3(-5,9,rampZ),scene);
   dockLight.parent=lift;
   dockLight.diffuse=new Color3(0.70,0.85,1);
   dockLight.intensity=1.15;

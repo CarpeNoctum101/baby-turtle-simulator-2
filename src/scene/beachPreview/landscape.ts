@@ -1,6 +1,8 @@
+import { course } from "../../movement/course";
+
 /** Visual terrain only. Keep the entire playable lane flat for the existing movement model. */
 export function beachHeight(x: number, z: number): number {
-  const outsideLane = smoothstep(7.8, 14, Math.abs(x));
+  const outsideLane = smoothstep(course.halfWidth, course.halfWidth + 6.2, Math.abs(x));
   const inland = 1 - smoothstep(1, 15, z);
   const dunes = 0.55 + 0.45 * Math.sin(x * 0.23 + z * 0.12) + 0.28 * Math.sin(z * 0.29 - x * 0.15);
   const nest = Math.exp(-(x * x + (z + 24) ** 2) * 1.8) * 0.035;
