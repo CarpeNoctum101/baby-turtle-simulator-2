@@ -1,0 +1,288 @@
+import { surfaceAt } from "../movement/course";
+import { clampDt } from "../abilities/clock";
+
+/**
+ * A seagull that guards a patch of beach. Coming close wakes it up; it chases at a little
+ * under the regular turtle's top speed, and a touch knocks both of them apart.
+ * When the turtle runs out of health the gull swoops in, carries it back toward the nest, and drops it.
+ */
+export const seagullRules = {
+  /** Chase speed as a fraction of the regular turtle's top speed on the ground below the gull. */
+  speedFactor: 0.9,
+  aggroRadius: 10,
+  /** Past this distance from its home the gull gives up and flies back. */
+  leashRadius: 18,
+  hitRange: 1.1,
+  damage: 14,
+  /** Starting push speeds in metres per second. Each fades out by `knockDecay`. */
+  playerKnockSpeed: 8,
+  gullKnockSpeed: 7,
+  knockDecay: 4.5,
+  /** After a strike the gull is dazed for this long before it chases again. */
+  recoverTime: 1.3,
+  perchHeight: 0.56,
+  flyHeight: 1.1,
+  /** Rescue (carry) tuning. */
+  swoopSpeed: 11,
+  grabTime: 0.6,
+  carryTime: 2.8,
+  carryDistance: 22,
+  carryHeight: 3.2,
+  /** How far below the gull the turtle hangs. */
+  dangle: 1,
+  dropTime: 0.8,
+  gravity: 20,
+  returnSpeed: 6,
+  /** Seconds the gull ignores the player after a rescue. */
+  graceAfterRescue: 6,
+  /** Share of max health the turtle gets back when it is set down. */
+  restoreFraction: 0.4,
+  /** The carry never goes further back than this. */
+  nestLimitZ: -30,
+} as const;
+
+export type SeagullPhase = "perched" | "chase" | "recover" | "swoop" | "grab" | "carry" | "drop" | "return";
+
+export interface Vec2 {
+  x: number;
+  z: number;
+}
+
+export interface Seagull {
+  id: string;
+  home: Vec2;
+  x: number;
+  y: number;
+  z: number;
+  /** Radians. 0 faces +Z, like the turtles. */
+  heading: number;
+  phase: SeagullPhase;
+  phaseTime: number;
+  knock: Vec2;
+  /** Seconds left in which the gull will not notice the player. */
+  grace: number;
+  carryFrom: Vec2;
+  carryTo: Vec2;
+}
+
+export function createSeagull(id: string, home: Vec2): Seagull {
+  return {
+    id,
+    home,
+    x: home.x,
+    y: seagullRules.perchHeight,
+    z: home.z,
+    heading: Math.PI,
+    phase: "perched",
+    phaseTime: 0,
+    knock: { x: 0, z: 0 },
+    grace: 0,
+    carryFrom: { x: home.x, z: home.z },
+    carryTo: { x: home.x, z: home.z },
+  };
+}
+
+/** Where the game puts seagulls. One guards the dry sand just past the nest. */
+export const seagullSpawns: readonly { id: string; home: Vec2 }[] = [{ id: "gull-1", home: { x: 2.5, z: 4 } }];
+
+export function isRescuePhase(phase: SeagullPhase): boolean {
+  return phase === "swoop" || phase === "grab" || phase === "carry" || phase === "drop";
+}
+
+/** Seagull chase speed at its current spot. */
+export function chaseSpeed(z: number): number {
+  return surfaceAt(z).maxSpeed * seagullRules.speedFactor;
+}
+
+/** The turtle's pose while a gull has it. y is the height above the sand. */
+export interface RescuePose {
+  x: number;
+  y: number;
+  z: number;
+}
+
+export interface SeagullInput {
+  dt: number;
+  player: Vec2;
+  /** True while the player may be attacked. False during another gull's rescue. */
+  canAttack: boolean;
+}
+
+export interface SeagullStep {
+  gull: Seagull;
+  /** True on the frame the gull reaches the turtle and can strike. */
+  contact: boolean;
+  pose: RescuePose | null;
+  /** True on the frame the turtle is set down and the rescue is over. */
+  rescueDone: boolean;
+  /** True on the frame the gull first clamps onto the turtle. */
+  grabbed: boolean;
+}
+
+/** Starts the rescue. The gull drops whatever it was doing and flies to the turtle. */
+export function beginRescue(gull: Seagull): Seagull {
+  return { ...gull, phase: "swoop", phaseTime: 0, knock: { x: 0, z: 0 } };
+}
+
+/** The gull bounces away from the turtle and is dazed for a moment. */
+export function strikeSeagull(gull: Seagull, player: Vec2): Seagull {
+  const away = unit(gull.x - player.x, gull.z - player.z, Math.sin(gull.heading + Math.PI), Math.cos(gull.heading + Math.PI));
+  return {
+    ...gull,
+    phase: "recover",
+    phaseTime: 0,
+    knock: { x: away.x * seagullRules.gullKnockSpeed, z: away.z * seagullRules.gullKnockSpeed },
+  };
+}
+
+/** The push the turtle receives when the gull strikes it, pointing from the gull through the turtle. */
+export function playerKnockFrom(gull: Seagull, player: Vec2): Vec2 {
+  const away = unit(player.x - gull.x, player.z - gull.z, Math.sin(gull.heading), Math.cos(gull.heading));
+  return { x: away.x * seagullRules.playerKnockSpeed, z: away.z * seagullRules.playerKnockSpeed };
+}
+
+/** Moves a knock-back along and fades it. Returns how far to shift this frame. */
+export function stepKnock(knock: Vec2, dt: number): { shift: Vec2; knock: Vec2 } {
+  const step = clampDt(dt);
+  const fade = Math.exp(-seagullRules.knockDecay * step);
+  const next = { x: knock.x * fade, z: knock.z * fade };
+  const settled = Math.hypot(next.x, next.z) < 0.05;
+  return {
+    shift: { x: knock.x * step, z: knock.z * step },
+    knock: settled ? { x: 0, z: 0 } : next,
+  };
+}
+
+export function stepSeagull(gull: Seagull, input: SeagullInput): SeagullStep {
+  const dt = clampDt(input.dt);
+  let next: Seagull = { ...gull, phaseTime: gull.phaseTime + dt, grace: Math.max(0, gull.grace - dt) };
+  const toPlayer = distance(next, input.player);
+  let contact = false;
+  let pose: RescuePose | null = null;
+  let rescueDone = false;
+  let grabbed = false;
+
+  if (!isRescuePhase(next.phase)) {
+    const moved = stepKnock(next.knock, dt);
+    next = { ...next, x: next.x + moved.shift.x, z: next.z + moved.shift.z, knock: moved.knock };
+  }
+
+  switch (next.phase) {
+    case "perched": {
+      next = settleAt(next, next.home, dt, seagullRules.perchHeight);
+      if (input.canAttack && next.grace <= 0 && toPlayer <= seagullRules.aggroRadius) {
+        next = { ...next, phase: "chase", phaseTime: 0 };
+      }
+      break;
+    }
+    case "chase": {
+      if (!input.canAttack || next.grace > 0 || distance(next, next.home) > seagullRules.leashRadius) {
+        next = { ...next, phase: "return", phaseTime: 0 };
+        break;
+      }
+      next = flyToward(next, input.player, chaseSpeed(next.z), dt, seagullRules.flyHeight);
+      contact = distance(next, input.player) <= seagullRules.hitRange;
+      break;
+    }
+    case "recover": {
+      next = { ...next, y: approach(next.y, seagullRules.flyHeight + 0.4, 3 * dt) };
+      if (next.phaseTime >= seagullRules.recoverTime) {
+        next = { ...next, phase: "chase", phaseTime: 0 };
+      }
+      break;
+    }
+    case "swoop": {
+      next = flyToward(next, input.player, seagullRules.swoopSpeed, dt, seagullRules.dangle + 0.1);
+      if (distance(next, input.player) <= 0.4) {
+        const target = {
+          x: next.x,
+          z: Math.max(seagullRules.nestLimitZ, input.player.z - seagullRules.carryDistance),
+        };
+        next = { ...next, phase: "grab", phaseTime: 0, carryFrom: { x: next.x, z: next.z }, carryTo: target };
+        grabbed = true;
+      }
+      pose = { x: input.player.x, y: 0, z: input.player.z };
+      break;
+    }
+    case "grab": {
+      pose = { x: next.carryFrom.x, y: 0, z: next.carryFrom.z };
+      next = { ...next, x: next.carryFrom.x, z: next.carryFrom.z, y: seagullRules.dangle + 0.1 };
+      if (next.phaseTime >= seagullRules.grabTime) {
+        next = { ...next, phase: "carry", phaseTime: 0 };
+      }
+      break;
+    }
+    case "carry": {
+      const t = Math.min(1, next.phaseTime / seagullRules.carryTime);
+      const glide = t * t * (3 - 2 * t);
+      const lift = Math.min(1, t / 0.2);
+      const y = seagullRules.dangle + 0.1 + (seagullRules.carryHeight - seagullRules.dangle - 0.1) * lift + Math.sin(t * 14) * 0.08;
+      const x = next.carryFrom.x + (next.carryTo.x - next.carryFrom.x) * glide;
+      const z = next.carryFrom.z + (next.carryTo.z - next.carryFrom.z) * glide;
+      const heading = Math.atan2(next.carryTo.x - next.carryFrom.x, next.carryTo.z - next.carryFrom.z) || Math.PI;
+      next = { ...next, x, y, z, heading };
+      pose = { x, y: Math.max(0, y - seagullRules.dangle), z };
+      if (t >= 1) {
+        next = { ...next, phase: "drop", phaseTime: 0 };
+      }
+      break;
+    }
+    case "drop": {
+      const start = seagullRules.carryHeight - seagullRules.dangle;
+      const fallen = 0.5 * seagullRules.gravity * next.phaseTime * next.phaseTime;
+      const turtleY = Math.max(0, start - fallen);
+      pose = { x: next.x, y: turtleY, z: next.z };
+      next = { ...next, y: next.y + 2.5 * dt };
+      if (next.phaseTime >= seagullRules.dropTime && turtleY === 0) {
+        rescueDone = true;
+        next = { ...next, phase: "return", phaseTime: 0, grace: seagullRules.graceAfterRescue };
+      }
+      break;
+    }
+    case "return": {
+      next = flyToward(next, next.home, seagullRules.returnSpeed, dt, seagullRules.flyHeight);
+      if (distance(next, next.home) <= 0.3) {
+        next = { ...next, phase: "perched", phaseTime: 0 };
+      }
+      break;
+    }
+  }
+
+  return { gull: next, contact, pose, rescueDone, grabbed };
+}
+
+function distance(a: Vec2, b: Vec2): number {
+  return Math.hypot(a.x - b.x, a.z - b.z);
+}
+
+function unit(dx: number, dz: number, fallbackX: number, fallbackZ: number): Vec2 {
+  const length = Math.hypot(dx, dz);
+  if (length < 0.001) {
+    return { x: fallbackX, z: fallbackZ };
+  }
+  return { x: dx / length, z: dz / length };
+}
+
+function approach(current: number, target: number, maxDelta: number): number {
+  return current < target ? Math.min(target, current + maxDelta) : Math.max(target, current - maxDelta);
+}
+
+function flyToward(gull: Seagull, target: Vec2, speed: number, dt: number, height: number): Seagull {
+  const dx = target.x - gull.x;
+  const dz = target.z - gull.z;
+  const gap = Math.hypot(dx, dz);
+  const travel = Math.min(gap, speed * dt);
+  const heading = gap > 0.001 ? Math.atan2(dx, dz) : gull.heading;
+  return {
+    ...gull,
+    x: gap > 0.001 ? gull.x + (dx / gap) * travel : gull.x,
+    z: gap > 0.001 ? gull.z + (dz / gap) * travel : gull.z,
+    y: approach(gull.y, height, 4 * dt),
+    heading,
+  };
+}
+
+function settleAt(gull: Seagull, spot: Vec2, dt: number, height: number): Seagull {
+  const settled = flyToward(gull, spot, seagullRules.returnSpeed, dt, height);
+  return { ...settled, heading: gull.heading };
+}

@@ -5,6 +5,7 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { Scene } from "@babylonjs/core/scene";
 import type { FlipperRig } from "./animateTurtle";
+import { createHeadRig } from "./headRig";
 
 export interface TurtlePaint {
   id?: string;
@@ -20,6 +21,8 @@ export interface PlaceholderTurtle {
   flippers: FlipperRig[];
   skin: StandardMaterial | PBRMaterial;
   shell: StandardMaterial | PBRMaterial;
+  /** Slides the head forward on a neck. 0 is the regular head. */
+  setHeadReach: (reach: number) => void;
 }
 
 /**
@@ -54,20 +57,21 @@ export function createPlaceholderTurtle(scene: Scene, paint: TurtlePaint = {}): 
   carapace.material = shell;
   carapace.parent = visual;
 
+  const headRig = createHeadRig(scene, visual, skin, id, { baseZ: 0.6, y: 0.31, diameter: 0.22 });
   const head = MeshBuilder.CreateSphere(`${id}Head`, { diameter: 0.38, segments: 12 }, scene);
   head.position.set(0, 0.32, 0.82);
   head.material = skin;
-  head.parent = visual;
+  head.parent = headRig.head;
 
   const leftEye = MeshBuilder.CreateSphere(`${id}LeftEye`, { diameter: 0.07, segments: 8 }, scene);
   leftEye.position.set(-0.1, 0.38, 0.98);
   leftEye.material = eye;
-  leftEye.parent = visual;
+  leftEye.parent = headRig.head;
 
   const rightEye = MeshBuilder.CreateSphere(`${id}RightEye`, { diameter: 0.07, segments: 8 }, scene);
   rightEye.position.set(0.1, 0.38, 0.98);
   rightEye.material = eye;
-  rightEye.parent = visual;
+  rightEye.parent = headRig.head;
 
   const flippers = [
     addFlipper(scene, visual, skin, `${id}FrontLeft`, { x: 0.78, y: 0.16, z: 0.28 }, { y: 0.45, z: -0.4 }, {
@@ -92,7 +96,7 @@ export function createPlaceholderTurtle(scene: Scene, paint: TurtlePaint = {}): 
     }),
   ];
 
-  return { root, visual, flippers, skin, shell };
+  return { root, visual, flippers, skin, shell, setHeadReach: headRig.setReach };
 }
 
 function addFlipper(

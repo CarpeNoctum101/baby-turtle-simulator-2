@@ -33,6 +33,8 @@ export interface RacerEffects {
 
 export interface AbilityLoadout {
   held: AbilityId | null;
+  /** A second stored ability, used only by turtles with two item slots. It moves up when `held` is spent. */
+  spare: AbilityId | null;
   effects: RacerEffects;
 }
 
@@ -53,6 +55,7 @@ export function createEffects(): RacerEffects {
 export function createLoadout(): AbilityLoadout {
   return {
     held: null,
+    spare: null,
     effects: createEffects(),
   };
 }
@@ -182,7 +185,8 @@ export function beginAbility(
   const rules = abilityCatalog[ability];
   const spent: AbilityLoadout = {
     ...loadout,
-    held: null,
+    held: loadout.spare,
+    spare: null,
   };
   if (ability === "flipper-frenzy") {
     return {

@@ -11,9 +11,22 @@
     <pre id="hud">Starting the beach scene…</pre>
     <p id="countdown" hidden>3</p>
     <p id="raceTimer" hidden>0:00.0</p>
+    <aside id="healthHud" hidden>
+      <p id="healthLabel">Health 100/100</p>
+      <div class="healthTrack"><div id="healthFill"></div></div>
+      <p id="rivalHealthLabel">Rival 100/100</p>
+      <div class="healthTrack small"><div id="rivalHealthFill"></div></div>
+    </aside>
     <aside id="abilityHud" hidden>
       <div id="abilitySlot" data-ability="empty" aria-label="No ability stored">
         <span id="abilityIcon"></span>
+      </div>
+      <div id="abilitySpare" data-ability="empty" hidden aria-label="Second slot empty">
+        <span id="abilitySpareIcon"></span>
+      </div>
+      <div id="snapHud" hidden>
+        <p id="snapLabel">Snap ready (E / Y)</p>
+        <div class="healthTrack small"><div id="snapFill"></div></div>
       </div>
       <div id="abilityTimer" hidden>
         <p id="abilityTimerLabel">0.0s</p>
@@ -26,9 +39,13 @@
       <div class="panel">
         <h1>Baby Turtle Simulator</h1>
         <p>Crawl from the nest, across the beach, and through the gate into the sea.</p>
-        <p>The left stick moves. Up follows the camera, and left or right move sideways. Only the right stick turns the camera, including up and down. Space or B brakes. X uses a Tide Orb ability.</p>
+        <p>The left stick moves. Up follows the camera, and left or right move sideways. Only the right stick turns the camera, including up and down. Space or B brakes. X uses a Tide Orb ability. E or Y snaps (Snappy only).</p>
+        <p>Pick a turtle:</p>
+        <div class="typePicker" role="radiogroup" aria-label="Turtle type"></div>
         <p>A second hatchling follows behind you. Sand Spray only catches a racer in the cloud behind your shell. The pale band at the shoreline is the wave zone.</p>
+        <p>Watch for the seagull near the middle of the dry sand. It chases at a little under your speed, and a hit knocks you both back. If your health reaches zero it carries you back toward the nest.</p>
         <button id="startRace" type="button">Start race</button>
+        <p class="credit">Seagull model by Bwinji Shamutete (Sketchfab), CC BY 4.0.</p>
       </div>
     </section>
     <section id="results" class="overlay" hidden>
@@ -36,6 +53,7 @@
         <h2>You reached the sea</h2>
         <p id="resultsPlace">1st of 1</p>
         <p id="resultsTime">Time 0:00.0</p>
+        <div class="typePicker" role="radiogroup" aria-label="Turtle type"></div>
         <button id="rematch" type="button">Rematch</button>
       </div>
     </section>

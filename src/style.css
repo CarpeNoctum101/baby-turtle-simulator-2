@@ -288,3 +288,153 @@ body:has(.ending-overlay:not([hidden])) #hudToggle,
 body:has(.ending-overlay:not([hidden])) #hud { display: none; }
 body:has(#results:not([hidden])) .ending-overlay { display: none; }
 body:has(.overlay:not([hidden])) #beachPreviewLink { display: none; }
+
+#healthHud {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 4;
+  width: 200px;
+  padding: 8px 12px 10px;
+  border-radius: 12px;
+  color: #f7f3e6;
+  background: rgba(20, 32, 24, 0.72);
+  pointer-events: none;
+}
+
+#healthHud[hidden],
+#abilitySpare[hidden],
+#snapHud[hidden] {
+  display: none;
+}
+
+#healthHud p {
+  margin: 0;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+#rivalHealthLabel {
+  margin-top: 8px !important;
+  font-size: 12px !important;
+  opacity: 0.85;
+}
+
+.healthTrack {
+  height: 12px;
+  margin-top: 4px;
+  border-radius: 99px;
+  background: rgba(255, 248, 230, 0.25);
+  overflow: hidden;
+}
+
+.healthTrack.small {
+  height: 6px;
+}
+
+#healthFill,
+#rivalHealthFill {
+  width: 100%;
+  height: 100%;
+  border-radius: 99px;
+  background: #6fcf6f;
+  transition: width 0.2s;
+}
+
+#rivalHealthFill {
+  background: #d98c5f;
+}
+
+#healthHud[data-tone="low"] #healthFill {
+  background: #f0c14a;
+}
+
+#healthHud[data-tone="empty"] #healthFill {
+  background: #d9534f;
+}
+
+#healthHud[data-hurt="true"] {
+  box-shadow: 0 0 0 3px rgba(217, 83, 79, 0.9);
+}
+
+#abilitySpare {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 2px solid rgba(255, 248, 230, 0.7);
+  border-radius: 12px;
+  background: rgba(18, 36, 32, 0.8);
+  opacity: 0.9;
+}
+
+#abilitySpare[data-ability="empty"] {
+  opacity: 0.4;
+}
+
+#abilitySpareIcon {
+  display: block;
+  width: 30px;
+  height: 30px;
+}
+
+#abilitySpareIcon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#snapHud {
+  min-width: 148px;
+  padding: 8px 12px 10px;
+  border-radius: 12px;
+  background: rgba(20, 32, 24, 0.72);
+}
+
+#snapLabel {
+  margin: 0;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+#snapFill {
+  width: 100%;
+  height: 100%;
+  border-radius: 99px;
+  background: #e8a04a;
+}
+
+.typePicker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.panel .typePicker button {
+  margin: 0;
+  padding: 8px 10px;
+  color: #1c2618;
+  background: rgba(47, 111, 98, 0.14);
+  border: 2px solid transparent;
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.panel .typePicker button small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.panel .typePicker button[aria-checked="true"] {
+  border-color: #2f6f62;
+  background: rgba(47, 111, 98, 0.3);
+}
+
+.panel .credit {
+  margin: 12px 0 0;
+  font-size: 11px;
+  opacity: 0.7;
+}
