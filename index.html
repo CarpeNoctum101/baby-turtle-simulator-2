@@ -11,11 +11,23 @@
     <pre id="hud">Starting the beach scene…</pre>
     <p id="countdown" hidden>3</p>
     <p id="raceTimer" hidden>0:00.0</p>
+    <aside id="abilityHud" hidden>
+      <div id="abilitySlot" data-ability="empty" aria-label="No ability stored">
+        <span id="abilityIcon"></span>
+      </div>
+      <div id="abilityTimer" hidden>
+        <p id="abilityTimerLabel">0.0s</p>
+        <div id="abilityMeterTrack">
+          <div id="abilityMeterFill"></div>
+        </div>
+      </div>
+    </aside>
     <section id="startScreen" class="overlay">
       <div class="panel">
         <h1>Baby Turtle Simulator</h1>
         <p>Crawl from the nest, across the beach, and through the gate into the sea.</p>
-        <p>The left stick moves. Up follows the camera, and left or right move sideways. Only the right stick turns the camera, including up and down. Space or B brakes.</p>
+        <p>The left stick moves. Up follows the camera, and left or right move sideways. Only the right stick turns the camera, including up and down. Space or B brakes. X uses a Tide Orb ability.</p>
+        <p>A second hatchling follows behind you. Sand Spray only catches a racer in the cloud behind your shell. The pale band at the shoreline is the wave zone.</p>
         <button id="startRace" type="button">Start race</button>
       </div>
     </section>

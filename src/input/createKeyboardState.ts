@@ -8,6 +8,7 @@ const handledKeys = new Set([
   "ArrowLeft",
   "ArrowRight",
   "Space",
+  "KeyX",
 ]);
 
 export interface KeyboardState {

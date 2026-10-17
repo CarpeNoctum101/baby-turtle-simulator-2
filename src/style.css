@@ -131,6 +131,117 @@ body {
 }
 
 #countdown[hidden],
-#raceTimer[hidden] {
+#raceTimer[hidden],
+#abilityHud[hidden],
+#abilityTimer[hidden] {
   display: none;
+}
+
+#abilityHud {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  z-index: 4;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  margin: 0;
+  color: #f7f3e6;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+#abilityHud[hidden] {
+  display: none;
+}
+
+#abilitySlot {
+  position: relative;
+  display: grid;
+  width: 76px;
+  height: 76px;
+  place-items: center;
+  border: 3px solid rgba(255, 248, 230, 0.92);
+  border-radius: 16px;
+  background: rgba(18, 36, 32, 0.88);
+  box-shadow: inset 0 0 0 3px rgba(47, 111, 98, 0.95);
+}
+
+#abilitySlot[data-ability="empty"]::before {
+  content: "";
+  width: 28px;
+  height: 28px;
+  border: 3px dashed rgba(255, 248, 230, 0.35);
+  border-radius: 50%;
+}
+
+#abilitySlot[data-ready="true"]::after {
+  content: "X";
+  position: absolute;
+  right: 6px;
+  bottom: 3px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+#abilityIcon {
+  display: block;
+  width: 52px;
+  height: 52px;
+}
+
+#abilityIcon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#abilityTimer {
+  min-width: 148px;
+  margin: 0;
+  padding: 8px 12px 10px;
+  border-radius: 12px;
+  background: rgba(20, 32, 24, 0.72);
+}
+
+#abilityTimerLabel {
+  margin: 0;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+#abilityMeterTrack {
+  height: 8px;
+  margin-top: 8px;
+  border-radius: 99px;
+  background: rgba(255, 248, 230, 0.25);
+  overflow: hidden;
+}
+
+#abilityMeterFill {
+  width: 0;
+  height: 100%;
+  border-radius: 99px;
+  background: #f0c14a;
+}
+
+#abilityHud[data-tone="active"] #abilityMeterFill {
+  background: #ef8b3a;
+}
+
+#abilityHud[data-tone="shield"] #abilityMeterFill {
+  background: #7ddec8;
+}
+
+#abilityHud[data-tone="spray"] #abilityMeterFill {
+  background: #e6d2a2;
+}
+
+#abilityHud[data-tone="wave"] #abilityMeterFill {
+  background: #8fd0ea;
+}
+
+#abilityHud[data-tone="trail"] #abilityMeterFill {
+  background: #d7c4ff;
 }
