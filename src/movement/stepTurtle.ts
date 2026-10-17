@@ -24,6 +24,12 @@ export function planFromYaw(yaw: number): CameraPlan {
   };
 }
 
+/** Temporary ability caps. 1 is a normal crawl. The sand's own numbers are multiplied by these. */
+export interface CrawlModifiers {
+  maxSpeedMultiplier?: number;
+  accelerationMultiplier?: number;
+}
+
 /** Position and crawl state. This is plain data, separate from the 3D meshes. */
 export interface TurtleMotion {
   x: number;
@@ -56,10 +62,13 @@ export function stepTurtle(
   input: DriveInput,
   dt: number,
   plan: CameraPlan = oceanPlan,
+  modifiers: CrawlModifiers = {},
 ): TurtleMotion {
   const safeDt = Math.min(Math.max(dt, 0), 0.05);
   const surface = surfaceAt(state.z);
   const wish = wishDirection(input.throttle, input.steer, plan);
+  const acceleration = surface.acceleration * scaleOf(modifiers.accelerationMultiplier);
+  const maxSpeed = surface.maxSpeed * scaleOf(modifiers.maxSpeedMultiplier);
 
   let heading = state.heading;
   let speed = state.speed;
@@ -67,12 +76,12 @@ export function stepTurtle(
     speed = moveToward(speed, 0, surface.brakeDeceleration * safeDt);
   } else if (wish) {
     heading = wish.heading;
-    speed += wish.amount * surface.acceleration * safeDt;
+    speed += wish.amount * acceleration * safeDt;
   } else {
     speed = moveToward(speed, 0, surface.deceleration * safeDt);
   }
 
-  speed = clamp(speed, 0, surface.maxSpeed);
+  speed = clamp(speed, 0, maxSpeed);
 
   return {
     x: clampToBeach(state.x + Math.sin(heading) * speed * safeDt),
@@ -111,4 +120,11 @@ function moveToward(current: number, target: number, maxDelta: number): number {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function scaleOf(value: number | undefined): number {
+  if (value === undefined || !Number.isFinite(value)) {
+    return 1;
+  }
+  return Math.max(0, value);
 }

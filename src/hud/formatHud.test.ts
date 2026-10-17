@@ -15,6 +15,9 @@ const base = {
   pointerLocked: false,
   deadZone: 0.18,
   gamepad: emptyGamepadReading,
+  place: 1,
+  field: 1,
+  abilityLine: "No ability. Collect a Tide Orb",
 };
 
 describe("formatHud", () => {
@@ -60,6 +63,7 @@ describe("formatHud", () => {
       },
     });
     expect(text).toContain("B brakes");
+    expect(text).toContain("X uses the held ability");
     expect(text).toContain("B (1)");
     expect(text).toContain("Active movement: Gamepad left stick");
   });

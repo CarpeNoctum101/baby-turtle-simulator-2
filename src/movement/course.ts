@@ -5,12 +5,12 @@ import { surfaces, type SurfaceProfile } from "./surfaces";
  * Dry sand, wet sand, then shallow water lead to a finish gate.
  */
 export const course = {
-  halfWidth: 8,
+  halfWidth: 12,
   nest: { x: 0, z: -24 },
-  dry: { minZ: -32, maxZ: -6 },
-  wet: { minZ: -6, maxZ: 14 },
-  water: { minZ: 14, maxZ: 52 },
-  finish: { minZ: 36, maxZ: 44 },
+  dry: { minZ: -32, maxZ: 14 },
+  wet: { minZ: 14, maxZ: 32 },
+  water: { minZ: 32, maxZ: 52 },
+  finish: { minZ: 52, maxZ: 60 },
 };
 
 /** Three pads at the nest. The player uses the center pad. */
@@ -45,4 +45,17 @@ export function clampToBeach(x: number): number {
 /** Stops the turtle at the back of the nest beach and the far side of the water. */
 export function clampToCourse(z: number): number {
   return Math.min(course.water.maxZ, Math.max(course.dry.minZ, z));
+}
+
+/**
+ * The band where Wave Rider can catch a boost.
+ * It sits on the shoreline, a little before the water and a little into it.
+ */
+export const waveZone = {
+  minZ: course.water.minZ - 3,
+  maxZ: course.water.minZ + 3,
+};
+
+export function isInWaveZone(x: number, z: number): boolean {
+  return Math.abs(x) <= course.halfWidth && z >= waveZone.minZ && z <= waveZone.maxZ;
 }

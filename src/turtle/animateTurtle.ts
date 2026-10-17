@@ -24,11 +24,14 @@ export function stepTurtleAnimation(
   flippers: readonly FlipperRig[],
   speed: number,
   dt: number,
+  frenzy = false,
 ): void {
   const safeDt = Math.min(Math.max(dt, 0), 0.05);
   const pace = Math.abs(speed);
-  animation.phase += safeDt * (1.4 + pace * 1.7);
-  const flap = Math.sin(animation.phase) * (0.08 + Math.min(0.5, pace * 0.11));
+  const rate = frenzy ? 2.6 : 1;
+  const amp = frenzy ? 1.9 : 1;
+  animation.phase += safeDt * (1.4 + pace * 1.7) * rate;
+  const flap = Math.sin(animation.phase) * (0.08 + Math.min(0.5, pace * 0.11)) * amp;
 
   for (const flipper of flippers) {
     const roleScale = flipper.role === "front" ? 1 : 0.6;

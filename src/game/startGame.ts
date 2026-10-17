@@ -1,6 +1,14 @@
 import { Engine } from "@babylonjs/core/Engines/engine";
+import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Scene } from "@babylonjs/core/scene";
+import { isTrailVisible, speedModifiers } from "../abilities/abilityState";
+import { abilityCatalog, raceAbilityPool } from "../abilities/catalog";
+import { createAbilityFx } from "../abilities/renderAbilityFx";
+import { stepAbilityWorld, createAbilityWorld, type AbilityWorld } from "../abilities/stepAbilityWorld";
+import { createAbilityCues } from "../audio/abilityCues";
 import { createFollowCamera, resetFollowCamera, updateFollowCamera } from "../camera/createThirdPersonCamera";
+import { abilityIcon } from "../hud/abilityIcon";
+import { formatAbilityHud, formatAbilityLine, formatPlace } from "../hud/formatAbilityHud";
 import { formatHud } from "../hud/formatHud";
 import { combineMovement } from "../input/combineControls";
 import { controlSettings, setStickDeadZone } from "../input/controlSettings";
@@ -9,12 +17,13 @@ import { createMouseLook } from "../input/createMouseLook";
 import { readKeyboard } from "../input/keyboard";
 import { pollGamepads } from "../input/pollGamepads";
 import { lookSource, stepLook, type LookOffsets } from "../input/stepLook";
-import { isInFinishZone, surfaceAt } from "../movement/course";
+import { isInFinishZone, isInWaveZone, surfaceAt } from "../movement/course";
 import { createTurtleMotion, planFromYaw, stepTurtle, type DriveInput, type TurtleMotion } from "../movement/stepTurtle";
 import { canDrive, countdownLabel, createRaceState, formatRaceTime, startCountdown, stepRace, type RaceState } from "../race/raceState";
+import { createRivalMotion, raceStanding, stepRival } from "../race/stepRival";
 import { createBeachScene } from "../scene/createBeachScene";
 import { stepTurtleAnimation, type TurtleAnimation } from "../turtle/animateTurtle";
-import { createPlaceholderTurtle } from "../turtle/createPlaceholderTurtle";
+import { createPlaceholderTurtle, type PlaceholderTurtle } from "../turtle/createPlaceholderTurtle";
 
 export interface GameUi {
   hud: HTMLElement;
@@ -25,7 +34,14 @@ export interface GameUi {
   raceTimer: HTMLElement;
   results: HTMLElement;
   resultsTime: HTMLElement;
+  resultsPlace: HTMLElement;
   rematchButton: HTMLButtonElement;
+  abilityHud: HTMLElement;
+  abilitySlot: HTMLElement;
+  abilityIcon: HTMLElement;
+  abilityTimer: HTMLElement;
+  abilityTimerLabel: HTMLElement;
+  abilityMeterFill: HTMLElement;
 }
 
 export interface RunningGame {
@@ -38,38 +54,57 @@ const idleDrive: DriveInput = { throttle: 0, steer: 0, brake: false };
 
 /**
  * Builds the beach once, then runs a single draw loop.
- * Starting again resets the turtle and the clock. It does not create another scene.
+ * Starting again resets the turtle, the rival, the orbs, and any ability that was still running.
  */
 export function startGame(canvas: HTMLCanvasElement, ui: GameUi): RunningGame {
   const engine = new Engine(canvas, true, { adaptToDeviceRatio: true });
   const scene = createBeachScene(engine);
   const turtle = createPlaceholderTurtle(scene);
+  const rivalTurtle = createPlaceholderTurtle(scene, {
+    id: "rival",
+    skin: new Color3(0.55, 0.62, 0.4),
+    shell: new Color3(0.25, 0.4, 0.48),
+  });
   const camera = createFollowCamera(scene);
   const keyboard = createKeyboardState(window);
   const mouse = createMouseLook(canvas);
+  const cues = createAbilityCues();
+  const fx = createAbilityFx(scene, turtle.visual);
 
   let motion = createTurtleMotion();
+  let rival = createRivalMotion(motion);
   let look: LookOffsets = { yaw: 0, pitch: 0 };
   let race = createRaceState();
+  let world: AbilityWorld = createAbilityWorld();
+  let abilityWasDown = false;
+  let blockFlash = 0;
+  let clock = 0;
   const animation: TurtleAnimation = { phase: 0 };
+  const rivalAnimation: TurtleAnimation = { phase: 0 };
   let hudVisible = true;
   const heldEdges = new Set<string>();
 
-  const placeTurtle = (next: TurtleMotion) => {
-    turtle.root.position.set(next.x, 0, next.z);
-    turtle.root.rotation.y = next.heading;
+  const placeTurtle = (body: PlaceholderTurtle, next: TurtleMotion) => {
+    body.root.position.set(next.x, 0, next.z);
+    body.root.rotation.y = next.heading;
   };
-  placeTurtle(motion);
+  placeTurtle(turtle, motion);
+  placeTurtle(rivalTurtle, rival);
 
   const restartRace = () => {
     motion = createTurtleMotion();
+    rival = createRivalMotion(motion);
     look = { yaw: 0, pitch: 0 };
     resetFollowCamera(camera);
     race = startCountdown(race);
-    placeTurtle(motion);
+    world = createAbilityWorld();
+    blockFlash = 0;
+    placeTurtle(turtle, motion);
+    placeTurtle(rivalTurtle, rival);
     canvas.focus();
   };
   const beginFromMenu = () => {
+    cues.unlock();
     if (race.phase !== "ready" && race.phase !== "finished") {
       return;
     }
@@ -104,6 +139,11 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi): RunningGame {
 
   engine.runRenderLoop(() => {
     const dt = engine.getDeltaTime() / 1000;
+    clock += dt;
+    blockFlash = Math.max(0, blockFlash - dt);
+    if (keyboard.keys.size > 0) {
+      cues.unlock();
+    }
     if (pressedOnce("BracketLeft")) {
       setStickDeadZone(controlSettings.stickDeadZone - 0.01);
     }
@@ -123,17 +163,73 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi): RunningGame {
     const gamepad = pollGamepads(controlSettings.stickDeadZone);
     const movement = combineMovement(readKeyboard(keyboard.keys), gamepad);
     const drive = canDrive(race.phase) ? movement : idleDrive;
+    const abilityDown = keyboard.keys.has("KeyX") || gamepad.ability;
+    const activate = abilityDown && !abilityWasDown;
+    abilityWasDown = abilityDown;
     look = stepLook(look, mouse.consume(), { x: gamepad.lookX, y: gamepad.lookY }, dt);
+
+    if (race.phase === "racing") {
+      const ticked = stepAbilityWorld(world, {
+        dt,
+        racing: true,
+        activate,
+        player: motion,
+        rival,
+        inWaveZone: isInWaveZone(motion.x, motion.z),
+        random: Math.random,
+        pool: raceAbilityPool,
+      });
+      world = ticked.world;
+      motion = ticked.player;
+      rival = ticked.rival;
+      for (const cue of ticked.cues) {
+        cues.play(cue);
+      }
+      if (ticked.cues.includes("block")) {
+        blockFlash = 0.28;
+      }
+    }
+
     if (race.phase === "racing" || race.phase === "countdown") {
-      motion = stepTurtle(motion, drive, dt, planFromYaw(look.yaw));
+      motion = stepTurtle(motion, drive, dt, planFromYaw(look.yaw), speedModifiers(world.loadout.effects));
+      if (race.phase === "racing") {
+        rival = stepRival(rival, motion, dt, speedModifiers(world.rivalEffects));
+      }
     }
     const reachedFinish = race.phase === "racing" && isInFinishZone(motion.x, motion.z);
     race = stepRace(race, dt, reachedFinish);
 
-    placeTurtle(motion);
+    placeTurtle(turtle, motion);
+    placeTurtle(rivalTurtle, rival);
     updateFollowCamera(camera, look, motion.x, motion.z);
-    stepTurtleAnimation(animation, turtle.visual, turtle.flippers, canDrive(race.phase) ? motion.speed : 0, dt);
-    syncRaceUi(ui, race, hudVisible);
+    const playerSpeed = canDrive(race.phase) ? motion.speed : 0;
+    stepTurtleAnimation(animation, turtle.visual, turtle.flippers, playerSpeed, dt, world.loadout.effects.frenzyRemaining > 0);
+    stepTurtleAnimation(rivalAnimation, rivalTurtle.visual, rivalTurtle.flippers, canDrive(race.phase) ? rival.speed : 0, dt, false);
+    fx.sync({
+      time: clock,
+      orbs: world.orbs,
+      clouds: world.clouds,
+      playerEffects: world.loadout.effects,
+      rivalEffects: world.rivalEffects,
+      blockFlash,
+      playerX: motion.x,
+      playerZ: motion.z,
+      trail: isTrailVisible(world.loadout.effects),
+      waveArmed: world.loadout.effects.waveWindowRemaining > 0,
+      waveBoost: world.loadout.effects.waveBoostRemaining > 0,
+      playerSkin: turtle.skin,
+      playerShell: turtle.shell,
+      rivalSkin: rivalTurtle.skin,
+      rivalShell: rivalTurtle.shell,
+    });
+
+    const standing = raceStanding(motion.z, rival.z);
+    const abilityView = formatAbilityHud({
+      held: world.loadout.held,
+      effects: world.loadout.effects,
+    });
+    syncAbilityHud(ui, abilityView);
+    syncRaceUi(ui, race, hudVisible, standing);
     ui.hud.textContent = formatHud({
       phase: race.phase,
       elapsed: race.elapsed,
@@ -147,6 +243,9 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi): RunningGame {
       pointerLocked: mouse.pointerLocked,
       deadZone: controlSettings.stickDeadZone,
       gamepad,
+      place: standing.place,
+      field: standing.field,
+      abilityLine: formatAbilityLine(abilityView),
     });
     scene.render();
   });
@@ -166,6 +265,7 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi): RunningGame {
       ui.rematchButton.removeEventListener("click", beginFromMenu);
       keyboard.dispose();
       mouse.dispose();
+      cues.dispose();
       camera.dispose();
       scene.dispose();
       engine.dispose();
@@ -173,10 +273,34 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi): RunningGame {
   };
 }
 
-function syncRaceUi(ui: GameUi, race: RaceState, hudVisible: boolean): void {
+function syncAbilityHud(ui: GameUi, view: ReturnType<typeof formatAbilityHud>): void {
+  const stored = view.stored ?? "empty";
+  const ready = view.stored !== null && view.timer === null;
+  ui.abilitySlot.dataset.ability = stored;
+  ui.abilitySlot.dataset.ready = String(ready);
+  ui.abilitySlot.setAttribute(
+    "aria-label",
+    view.stored ? (ready ? `${abilityCatalog[view.stored].name}. Press X.` : abilityCatalog[view.stored].name) : "No ability stored",
+  );
+  ui.abilityIcon.innerHTML = view.stored ? abilityIcon(view.stored) : "";
+  ui.abilityTimer.hidden = view.timer === null;
+  ui.abilityHud.dataset.tone = view.timer?.tone ?? "empty";
+  if (view.timer) {
+    ui.abilityTimerLabel.textContent = view.timer.label;
+    ui.abilityMeterFill.style.width = `${view.timer.meter * 100}%`;
+  }
+}
+
+function syncRaceUi(
+  ui: GameUi,
+  race: RaceState,
+  hudVisible: boolean,
+  standing: { place: number; field: number },
+): void {
   const menuOpen = race.phase === "ready" || race.phase === "finished";
   ui.hud.hidden = menuOpen || !hudVisible;
   ui.hudToggle.hidden = menuOpen;
+  ui.abilityHud.hidden = menuOpen;
   ui.startScreen.hidden = race.phase !== "ready";
   ui.results.hidden = race.phase !== "finished";
   const label = countdownLabel(race);
@@ -189,6 +313,7 @@ function syncRaceUi(ui: GameUi, race: RaceState, hudVisible: boolean): void {
     ui.raceTimer.textContent = formatRaceTime(race.elapsed);
   }
   if (race.phase === "finished" && race.finishTime !== null) {
+    ui.resultsPlace.textContent = formatPlace(standing.place, standing.field);
     ui.resultsTime.textContent = `Time ${formatRaceTime(race.finishTime)}`;
   }
 }

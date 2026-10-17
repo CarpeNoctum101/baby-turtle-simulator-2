@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { stepLook } from "../input/stepLook";
-import { course, isInFinishZone, surfaceAt } from "./course";
+import { course, isInFinishZone, isInWaveZone, surfaceAt } from "./course";
 import { surfaces } from "./surfaces";
 import { createTurtleMotion, planFromYaw, stepTurtle, type TurtleMotion } from "./stepTurtle";
 
@@ -25,14 +25,21 @@ function simulate(
 describe("course surfaces", () => {
   it("starts on dry sand, then wet sand, then shallow water", () => {
     expect(surfaceAt(course.nest.z).id).toBe("dry-sand");
-    expect(surfaceAt(0).id).toBe("wet-sand");
-    expect(surfaceAt(20).id).toBe("shallow-water");
+    expect(surfaceAt((course.wet.minZ + course.wet.maxZ) / 2).id).toBe("wet-sand");
+    expect(surfaceAt((course.water.minZ + course.water.maxZ) / 2).id).toBe("shallow-water");
   });
 
   it("counts the pale gate as the finish and ignores the beach beside it", () => {
-    expect(isInFinishZone(0, 40)).toBe(true);
-    expect(isInFinishZone(0, 10)).toBe(false);
-    expect(isInFinishZone(20, 40)).toBe(false);
+    const gate = (course.finish.minZ + course.finish.maxZ) / 2;
+    expect(isInFinishZone(0, gate)).toBe(true);
+    expect(isInFinishZone(0, course.nest.z)).toBe(false);
+    expect(isInFinishZone(course.halfWidth + 1, gate)).toBe(false);
+  });
+
+  it("keeps the wave zone on the shoreline and off the nest", () => {
+    expect(isInWaveZone(0, course.water.minZ)).toBe(true);
+    expect(isInWaveZone(0, course.nest.z)).toBe(false);
+    expect(isInWaveZone(course.halfWidth + 1, course.water.minZ)).toBe(false);
   });
 });
 
@@ -47,7 +54,7 @@ describe("stepTurtle", () => {
 
   it("reaches a higher speed in shallow water than on dry sand", () => {
     const dry = simulate(createTurtleMotion(), drive, 3);
-    const waterStart = { ...createTurtleMotion(), z: 20 };
+    const waterStart = { ...createTurtleMotion(), z: course.water.minZ + 2 };
     const water = simulate(waterStart, drive, 3);
     expect(dry.speed).toBeLessThanOrEqual(surfaces["dry-sand"].maxSpeed + 0.001);
     expect(water.speed).toBeGreaterThan(dry.speed + 2);
@@ -55,8 +62,8 @@ describe("stepTurtle", () => {
 
   it("glides briefly in water, then settles instead of sliding", () => {
     const dry = simulate({ ...createTurtleMotion(), speed: surfaces["dry-sand"].maxSpeed }, coast, 0.5);
-    const water = simulate({ ...createTurtleMotion(), z: 20, speed: surfaces["shallow-water"].maxSpeed }, coast, 0.5);
-    const settled = simulate({ ...createTurtleMotion(), z: 20, speed: surfaces["shallow-water"].maxSpeed }, coast, 1.6);
+    const water = simulate({ ...createTurtleMotion(), z: course.water.minZ + 2, speed: surfaces["shallow-water"].maxSpeed }, coast, 0.5);
+    const settled = simulate({ ...createTurtleMotion(), z: course.water.minZ + 2, speed: surfaces["shallow-water"].maxSpeed }, coast, 1.6);
     expect(dry.speed).toBe(0);
     expect(water.speed).toBeGreaterThan(dry.speed);
     expect(water.speed).toBeLessThan(surfaces["shallow-water"].maxSpeed * 0.75);
@@ -119,6 +126,19 @@ describe("stepTurtle", () => {
   it("does not leap forward when a frame is very long", () => {
     const moved = stepTurtle(createTurtleMotion(), drive, 5);
     expect(moved.speed).toBeLessThan(0.2);
+  });
+
+  it("gives back the extra speed on the frame the boost ends", () => {
+    const boosted = stepTurtle(
+      { ...createTurtleMotion(), speed: surfaces["dry-sand"].maxSpeed },
+      drive,
+      frame,
+      undefined,
+      { maxSpeedMultiplier: 1.65, accelerationMultiplier: 1.4 },
+    );
+    const expired = stepTurtle(boosted, drive, frame);
+    expect(boosted.speed).toBeGreaterThan(surfaces["dry-sand"].maxSpeed);
+    expect(expired.speed).toBeLessThanOrEqual(surfaces["dry-sand"].maxSpeed + 0.001);
   });
 
   it("stops at the far side of the water instead of leaving the course", () => {

@@ -54,6 +54,14 @@ describe("readGamepadSnapshot", () => {
     expect(reading.pressedButtons.map((button) => button.index)).toEqual([1]);
   });
 
+  it("uses the X button as the ability on a standard pad only", () => {
+    const xbox = readGamepadSnapshot(snapshot({ buttons: buttons([2]) }), 0.18);
+    const unknown = readGamepadSnapshot(snapshot({ mapping: "", buttons: buttons([2]) }), 0.18);
+    expect(xbox.ability).toBe(true);
+    expect(xbox.brake).toBe(false);
+    expect(unknown.ability).toBe(false);
+  });
+
   it("does not treat the A button as brake on a standard pad", () => {
     const reading = readGamepadSnapshot(snapshot({ buttons: buttons([0]) }), 0.18);
     expect(reading.brake).toBe(false);
