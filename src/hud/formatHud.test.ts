@@ -3,7 +3,9 @@ import { emptyGamepadReading } from "../input/readGamepad";
 import { formatHud } from "./formatHud";
 
 const base = {
-  finished: false,
+  phase: "ready" as const,
+  elapsed: 0,
+  finishTime: null,
   surfaceLabel: "Dry sand",
   speed: 0,
   x: 0,
@@ -18,6 +20,7 @@ const base = {
 describe("formatHud", () => {
   it("names keyboard and mouse as the active controls by default", () => {
     const text = formatHud(base);
+    expect(text).toContain("Ready at the nest");
     expect(text).toContain("Active movement: Keyboard (WASD)");
     expect(text).toContain("Active look: Mouse");
     expect(text).toContain("Controller: not detected");

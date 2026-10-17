@@ -1,4 +1,3 @@
-import { applyDeadZone } from "./deadZone";
 import { mappingForGamepad } from "./gamepadMapping";
 import type { GamepadSnapshot } from "./types";
 
@@ -42,6 +41,20 @@ export function readGamepadSnapshot(snapshot: GamepadSnapshot, deadZone: number,
   const stickMapping = mappingForGamepad(snapshot.mapping);
   const brakeButton = stickMapping.brakeButton;
   const brake = brakeButton !== null && snapshot.buttons[brakeButton]?.pressed === true;
+  const move = shapeStick(
+    axis(snapshot.axes, stickMapping.steerAxis),
+    axis(snapshot.axes, stickMapping.throttleAxis),
+    deadZone,
+    false,
+    stickMapping.invertThrottle,
+  );
+  const look = shapeStick(
+    axis(snapshot.axes, stickMapping.lookXAxis),
+    axis(snapshot.axes, stickMapping.lookYAxis),
+    deadZone,
+    stickMapping.invertLookX,
+    stickMapping.invertLookY,
+  );
 
   return {
     connected: true,
@@ -49,10 +62,10 @@ export function readGamepadSnapshot(snapshot: GamepadSnapshot, deadZone: number,
     id: snapshot.id,
     mapping: snapshot.mapping,
     usesStandardMapping: snapshot.mapping === "standard",
-    throttle: readAxis(snapshot.axes, stickMapping.throttleAxis, stickMapping.invertThrottle, deadZone),
-    steer: readAxis(snapshot.axes, stickMapping.steerAxis, false, deadZone),
-    lookX: readAxis(snapshot.axes, stickMapping.lookXAxis, stickMapping.invertLookX, deadZone),
-    lookY: readAxis(snapshot.axes, stickMapping.lookYAxis, stickMapping.invertLookY, deadZone),
+    throttle: move.y,
+    steer: move.x,
+    lookX: look.x,
+    lookY: look.y,
     brake,
     pressedButtons: snapshot.buttons
       .map((button, index) => ({ index, value: button.value, pressed: button.pressed }))
@@ -62,11 +75,33 @@ export function readGamepadSnapshot(snapshot: GamepadSnapshot, deadZone: number,
   };
 }
 
-function readAxis(axes: readonly number[], index: number, invert: boolean, deadZone: number): number {
+function axis(axes: readonly number[], index: number): number {
   const raw = axes[index] ?? 0;
-  const shaped = applyDeadZone(raw, deadZone);
-  if (shaped === 0) {
-    return 0;
+  return Number.isFinite(raw) ? raw : 0;
+}
+
+/**
+ * Reads one stick as a single direction.
+ * The dead zone is circular, so a diagonal push is not thrown away one axis at a time.
+ */
+function shapeStick(
+  x: number,
+  y: number,
+  deadZone: number,
+  invertX: boolean,
+  invertY: boolean,
+): { x: number; y: number } {
+  const zone = Math.min(0.95, Math.max(0, Number.isFinite(deadZone) ? deadZone : 0));
+  const rawX = Math.min(1, Math.max(-1, Number.isFinite(x) ? x : 0));
+  const rawY = Math.min(1, Math.max(-1, Number.isFinite(y) ? y : 0));
+  const magnitude = Math.hypot(rawX, rawY);
+  if (magnitude === 0 || magnitude <= zone) {
+    return { x: 0, y: 0 };
   }
-  return invert ? -shaped : shaped;
+  const scaled = (Math.min(1, magnitude) - zone) / (1 - zone) / magnitude;
+  const shapedX = rawX * Math.min(1, scaled);
+  const shapedY = rawY * Math.min(1, scaled);
+  const nextX = (invertX ? -shapedX : shapedX) || 0;
+  const nextY = (invertY ? -shapedY : shapedY) || 0;
+  return { x: nextX, y: nextY };
 }

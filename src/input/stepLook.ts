@@ -10,7 +10,10 @@ export interface LookStick {
   y: number;
 }
 
-/** Adds mouse movement and right-stick movement into one camera offset. */
+/**
+ * Adds mouse movement and right-stick look into one camera offset.
+ * The left stick does not come through here, so it cannot turn the view.
+ */
 export function stepLook(
   look: LookOffsets,
   mouse: { yawDelta: number; pitchDelta: number },

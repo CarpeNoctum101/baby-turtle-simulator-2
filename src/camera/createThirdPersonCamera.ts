@@ -1,68 +1,81 @@
 import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
-import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { Scene } from "@babylonjs/core/scene";
 import type { LookOffsets } from "../input/stepLook";
 
 export interface FollowCameraRig {
   camera: ArcRotateCamera;
   radius: number;
+  target: Vector3;
   dispose: () => void;
 }
 
-/**
- * A low camera behind the turtle. It eases toward the turtle's heading
- * instead of snapping, and mouse or right-stick look is added on top.
- */
-export function createFollowCamera(scene: Scene, turtle: TransformNode): FollowCameraRig {
-  const aim = new TransformNode("cameraAim", scene);
-  aim.parent = turtle;
-  aim.position = new Vector3(0, 0.45, 0);
+/** Alpha -PI/2 looks toward +Z. Adding look.yaw turns away from that. */
+const restAlpha = -Math.PI / 2;
+const restBeta = 1.22;
+const eyeHeight = 0.45;
+/** Stops just short of straight overhead and straight underneath, so the view cannot flip. */
+const minBeta = 0.15;
+const maxBeta = Math.PI - 0.15;
 
-  const camera = new ArcRotateCamera("thirdPerson", -Math.PI / 2, 1.22, 6.5, aim.position.clone(), scene);
-  camera.lockedTarget = aim;
-  camera.lowerBetaLimit = 0.85;
-  camera.upperBetaLimit = 1.48;
+/**
+ * A camera that sits behind the player's look direction.
+ * Alpha and beta are set from the look offsets every frame, so the view cannot drift on its own.
+ */
+export function createFollowCamera(scene: Scene): FollowCameraRig {
+  const target = new Vector3(0, eyeHeight, 0);
+  const camera = new ArcRotateCamera("thirdPerson", restAlpha, restBeta, 6.5, target, scene);
+  camera.inputs.clear();
   camera.inertia = 0;
   camera.panningSensibility = 0;
+  camera.lowerRadiusLimit = 3.5;
+  camera.upperRadiusLimit = 14;
+  camera.lowerBetaLimit = minBeta;
+  camera.upperBetaLimit = maxBeta;
+  camera.lockedTarget = null;
+  camera.parent = null;
 
   const canvas = scene.getEngine().getRenderingCanvas();
   let onWheel: (event: WheelEvent) => void = () => {};
   const rig: FollowCameraRig = {
     camera,
     radius: 6.5,
+    target,
     dispose() {
       canvas?.removeEventListener("wheel", onWheel);
     },
   };
   onWheel = (event: WheelEvent) => {
     event.preventDefault();
-    const direction = Math.sign(event.deltaY);
-    rig.radius = clamp(rig.radius + direction * 0.45, 3.5, 14);
+    rig.radius = clamp(rig.radius + Math.sign(event.deltaY) * 0.45, 3.5, 14);
   };
   canvas?.addEventListener("wheel", onWheel, { passive: false });
 
   return rig;
 }
 
-export function updateFollowCamera(rig: FollowCameraRig, heading: number, look: LookOffsets, dt: number): void {
-  const safeDt = Math.min(Math.max(dt, 0), 0.05);
-  const blend = 1 - Math.exp(-6 * safeDt);
-  const desiredAlpha = -Math.PI / 2 - heading + look.yaw;
-  const desiredBeta = clamp(1.22 + look.pitch, rig.camera.lowerBetaLimit ?? 0.85, rig.camera.upperBetaLimit ?? 1.48);
-
-  rig.camera.alpha = lerpAngle(rig.camera.alpha, desiredAlpha, blend);
-  rig.camera.beta = lerp(rig.camera.beta, desiredBeta, blend);
-  rig.camera.radius = lerp(rig.camera.radius, rig.radius, blend);
+/** Clears leftover camera motion before a race starts again. */
+export function resetFollowCamera(rig: FollowCameraRig): void {
+  rig.camera.alpha = restAlpha;
+  rig.camera.beta = restBeta;
+  rig.camera.inertialAlphaOffset = 0;
+  rig.camera.inertialBetaOffset = 0;
+  rig.camera.inertialRadiusOffset = 0;
+  rig.camera.inertialPanningX = 0;
+  rig.camera.inertialPanningY = 0;
 }
 
-function lerp(current: number, target: number, amount: number): number {
-  return current + (target - current) * amount;
-}
-
-function lerpAngle(current: number, target: number, amount: number): number {
-  const difference = Math.atan2(Math.sin(target - current), Math.cos(target - current));
-  return current + difference * amount;
+/** Puts the camera behind the look direction. The turtle's heading is not used. */
+export function updateFollowCamera(rig: FollowCameraRig, look: LookOffsets, x: number, z: number): void {
+  rig.target.set(x, eyeHeight, z);
+  rig.camera.alpha = restAlpha + look.yaw;
+  rig.camera.beta = clamp(restBeta + look.pitch, minBeta, maxBeta);
+  rig.camera.radius = rig.radius;
+  rig.camera.inertialAlphaOffset = 0;
+  rig.camera.inertialBetaOffset = 0;
+  rig.camera.inertialRadiusOffset = 0;
+  rig.camera.inertialPanningX = 0;
+  rig.camera.inertialPanningY = 0;
 }
 
 function clamp(value: number, min: number, max: number): number {

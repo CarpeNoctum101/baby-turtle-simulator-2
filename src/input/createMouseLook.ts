@@ -12,59 +12,55 @@ export interface MouseLook {
 }
 
 /**
- * Mouse look is the default camera control.
- * Clicking captures the cursor. Dragging also looks around when capture is unavailable.
+ * The camera turns only while the right mouse button is held.
+ * A normal click does not capture the cursor, so holding W cannot spin the view.
  */
 export function createMouseLook(canvas: HTMLCanvasElement): MouseLook {
-  let pointerLocked = false;
   let pendingYaw = 0;
   let pendingPitch = 0;
-  let dragging = false;
+  let looking = false;
 
-  const onClick = () => {
-    canvas.focus();
-    if (document.pointerLockElement !== canvas) {
-      void canvas.requestPointerLock().catch(() => {
-        // Dragging still rotates the view when the browser refuses pointer lock.
-      });
-    }
-  };
-
-  const onLockChange = () => {
-    pointerLocked = document.pointerLockElement === canvas;
-    dragging = false;
+  const onContextMenu = (event: Event) => {
+    event.preventDefault();
   };
 
   const onPointerDown = (event: PointerEvent) => {
-    if (event.button === 0 && document.pointerLockElement !== canvas) {
-      dragging = true;
+    if (event.button !== 2) {
+      return;
     }
+    looking = true;
+    canvas.focus();
   };
 
   const onPointerUp = (event: PointerEvent) => {
-    if (event.button === 0) {
-      dragging = false;
+    if (event.button === 2) {
+      looking = false;
     }
+  };
+
+  const onBlur = () => {
+    looking = false;
   };
 
   const onMouseMove = (event: MouseEvent) => {
-    const looking = document.pointerLockElement === canvas || dragging;
     if (!looking) {
       return;
     }
-    pendingYaw -= event.movementX * controlSettings.mouseYawSensitivity;
-    pendingPitch += event.movementY * controlSettings.mousePitchSensitivity;
+    const movementX = clamp(event.movementX, -50, 50);
+    const movementY = clamp(event.movementY, -50, 50);
+    pendingYaw -= movementX * controlSettings.mouseYawSensitivity;
+    pendingPitch += movementY * controlSettings.mousePitchSensitivity;
   };
 
-  canvas.addEventListener("click", onClick);
-  document.addEventListener("pointerlockchange", onLockChange);
+  canvas.addEventListener("contextmenu", onContextMenu);
   canvas.addEventListener("pointerdown", onPointerDown);
   window.addEventListener("pointerup", onPointerUp);
+  window.addEventListener("blur", onBlur);
   window.addEventListener("mousemove", onMouseMove);
 
   return {
     get pointerLocked() {
-      return pointerLocked;
+      return looking;
     },
     consume() {
       const delta = { yawDelta: pendingYaw, pitchDelta: pendingPitch };
@@ -73,14 +69,16 @@ export function createMouseLook(canvas: HTMLCanvasElement): MouseLook {
       return delta;
     },
     dispose() {
-      canvas.removeEventListener("click", onClick);
-      document.removeEventListener("pointerlockchange", onLockChange);
+      canvas.removeEventListener("contextmenu", onContextMenu);
       canvas.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("blur", onBlur);
       window.removeEventListener("mousemove", onMouseMove);
-      if (document.pointerLockElement === canvas) {
-        document.exitPointerLock();
-      }
+      looking = false;
     },
   };
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }

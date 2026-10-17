@@ -1,17 +1,23 @@
 import { describe, expect, it } from "vitest";
+import { stepLook } from "../input/stepLook";
 import { course, isInFinishZone, surfaceAt } from "./course";
 import { surfaces } from "./surfaces";
-import { createTurtleMotion, stepTurtle, type TurtleMotion } from "./stepTurtle";
+import { createTurtleMotion, planFromYaw, stepTurtle, type TurtleMotion } from "./stepTurtle";
 
 const frame = 1 / 60;
 const coast = { throttle: 0, steer: 0, brake: false };
 const drive = { throttle: 1, steer: 0, brake: false };
 
-function simulate(state: TurtleMotion, input: { throttle: number; steer: number; brake: boolean }, seconds: number): TurtleMotion {
+function simulate(
+  state: TurtleMotion,
+  input: { throttle: number; steer: number; brake: boolean },
+  seconds: number,
+  plan?: { forwardX: number; forwardZ: number },
+): TurtleMotion {
   let current = state;
   const steps = Math.round(seconds / frame);
   for (let step = 0; step < steps; step += 1) {
-    current = stepTurtle(current, input, frame);
+    current = stepTurtle(current, input, frame, plan);
   }
   return current;
 }
@@ -47,10 +53,14 @@ describe("stepTurtle", () => {
     expect(water.speed).toBeGreaterThan(dry.speed + 2);
   });
 
-  it("coasts farther in water than on dry sand", () => {
-    const dry = simulate({ ...createTurtleMotion(), speed: 3 }, coast, 0.5);
-    const water = simulate({ ...createTurtleMotion(), z: 20, speed: 3 }, coast, 0.5);
-    expect(water.speed).toBeGreaterThan(dry.speed + 1);
+  it("glides briefly in water, then settles instead of sliding", () => {
+    const dry = simulate({ ...createTurtleMotion(), speed: surfaces["dry-sand"].maxSpeed }, coast, 0.5);
+    const water = simulate({ ...createTurtleMotion(), z: 20, speed: surfaces["shallow-water"].maxSpeed }, coast, 0.5);
+    const settled = simulate({ ...createTurtleMotion(), z: 20, speed: surfaces["shallow-water"].maxSpeed }, coast, 1.6);
+    expect(dry.speed).toBe(0);
+    expect(water.speed).toBeGreaterThan(dry.speed);
+    expect(water.speed).toBeLessThan(surfaces["shallow-water"].maxSpeed * 0.75);
+    expect(settled.speed).toBeLessThan(0.5);
   });
 
   it("brakes harder than coasting", () => {
@@ -59,24 +69,51 @@ describe("stepTurtle", () => {
     expect(braking.speed).toBeLessThan(coasting.speed);
   });
 
-  it("lets the steer lag behind a sudden stick flick", () => {
-    const flicked = stepTurtle(createTurtleMotion(), { throttle: 0, steer: 1, brake: false }, frame);
-    expect(flicked.steer).toBeGreaterThan(0);
-    expect(flicked.steer).toBeLessThan(0.3);
+  it("moves to the camera's right when the left stick is held right", () => {
+    const started = createTurtleMotion();
+    const moved = simulate(started, { throttle: 0, steer: 1, brake: false }, 0.6);
+    expect(moved.x).toBeGreaterThan(started.x + 0.2);
+    expect(moved.z).toBeCloseTo(started.z, 1);
+    expect(moved.heading).toBeCloseTo(Math.PI / 2, 5);
   });
 
-  it("turns more slowly in water than on wet sand", () => {
-    const wet = stepTurtle(
-      { ...createTurtleMotion(), z: 0, speed: 4 },
-      { throttle: 1, steer: 1, brake: false },
-      frame,
-    );
-    const water = stepTurtle(
-      { ...createTurtleMotion(), z: 20, speed: 4 },
-      { throttle: 1, steer: 1, brake: false },
-      frame,
-    );
-    expect(wet.steer).toBeGreaterThan(water.steer);
+  it("keeps the camera still while the left stick moves, then follows a right-stick turn", () => {
+    let look = { yaw: 0, pitch: 0 };
+    let motion = createTurtleMotion();
+    const noMouse = { yawDelta: 0, pitchDelta: 0 };
+    for (let step = 0; step < 30; step += 1) {
+      look = stepLook(look, noMouse, { x: 0, y: 0 }, frame);
+      motion = stepTurtle(motion, { throttle: 1, steer: 1, brake: false }, frame, planFromYaw(look.yaw));
+    }
+    expect(look.yaw).toBe(0);
+    expect(motion.x).toBeGreaterThan(0.15);
+    expect(motion.z).toBeGreaterThan(-24);
+
+    for (let step = 0; step < 40; step += 1) {
+      look = stepLook(look, noMouse, { x: -1, y: 0 }, frame);
+    }
+    const turned = motion;
+    expect(look.yaw).toBeLessThan(-0.8);
+    for (let step = 0; step < 40; step += 1) {
+      look = stepLook(look, noMouse, { x: 0, y: 0 }, frame);
+      motion = stepTurtle(motion, drive, frame, planFromYaw(look.yaw));
+    }
+    expect(motion.x).toBeGreaterThan(turned.x + 0.2);
+  });
+
+  it("treats stick up as forward for whichever way the camera looks", () => {
+    const started = createTurtleMotion();
+    const moved = simulate(started, drive, 0.6, { forwardX: 1, forwardZ: 0 });
+    expect(moved.x).toBeGreaterThan(started.x + 0.2);
+    expect(moved.z).toBeCloseTo(started.z, 1);
+    expect(moved.heading).toBeCloseTo(Math.PI / 2, 5);
+  });
+
+  it("points stick up down the beach at yaw zero, and to +X when looking right", () => {
+    expect(planFromYaw(0)).toEqual({ forwardX: 0, forwardZ: 1 });
+    const lookingRight = planFromYaw(-Math.PI / 2);
+    expect(lookingRight.forwardX).toBeCloseTo(1);
+    expect(lookingRight.forwardZ).toBeCloseTo(0);
   });
 
   it("does not leap forward when a frame is very long", () => {

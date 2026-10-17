@@ -1,8 +1,11 @@
 import { describeButton } from "../input/gamepadMapping";
 import type { GamepadReading } from "../input/readGamepad";
+import { formatRaceTime, type RacePhase } from "../race/raceState";
 
 export interface HudModel {
-  finished: boolean;
+  phase: RacePhase;
+  elapsed: number;
+  finishTime: number | null;
   surfaceLabel: string;
   speed: number;
   x: number;
@@ -17,21 +20,30 @@ export interface HudModel {
 /** Builds the on-screen text. Gamepad names are inserted as plain text by the caller. */
 export function formatHud(model: HudModel): string {
   const lines = [
-    model.finished
-      ? "Finished. The turtle reached the sea. Press R to run it again."
-      : "Drive from the nest, across the beach, to the pale gate in the water.",
+    raceHeadline(model),
     `Surface: ${model.surfaceLabel}`,
     `Speed: ${model.speed.toFixed(2)}    Position: x ${model.x.toFixed(1)}, z ${model.z.toFixed(1)}`,
     `Active movement: ${model.movementSource === "keyboard" ? "Keyboard (WASD)" : "Gamepad left stick"}`,
     `Active look: ${model.lookSource === "mouse" ? "Mouse" : "Gamepad right stick"}`,
-    model.pointerLocked
-      ? "Mouse captured. Press Esc to release the cursor."
-      : "Click the scene to capture the mouse. Dragging also looks around.",
-    "WASD moves and steers. Arrow keys do the same. Space brakes. R resets. H hides this readout.",
+    "Hold the right mouse button and drag to look. The view stays still while you only hold W or stick up.",
+    "W or the left stick moves the way the camera looks. A, D, or the left stick move sideways. Only the right stick turns the camera. Space brakes. R restarts. H hides this readout.",
     `[ and ] change the stick dead zone. Current dead zone: ${model.deadZone.toFixed(2)}`,
     formatGamepad(model.gamepad),
   ];
   return lines.join("\n");
+}
+
+function raceHeadline(model: HudModel): string {
+  if (model.phase === "ready") {
+    return "Ready at the nest. Start the race when you are set.";
+  }
+  if (model.phase === "countdown") {
+    return "Hold still. The countdown is running.";
+  }
+  if (model.phase === "finished") {
+    return `Finished in ${formatRaceTime(model.finishTime ?? model.elapsed)}. Place: 1st of 1.`;
+  }
+  return `Time ${formatRaceTime(model.elapsed)}    Place: 1st of 1`;
 }
 
 function formatGamepad(gamepad: GamepadReading): string {

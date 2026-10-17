@@ -7,8 +7,9 @@ export const controlSettings = {
   mouseYawSensitivity: 0.0032,
   mousePitchSensitivity: 0.0022,
   stickLookYawRate: 1.7,
-  stickLookPitchRate: 0.9,
-  lookPitchLimit: 0.32,
+  stickLookPitchRate: 1.7,
+  /** How far the right stick can pitch, in radians. Large enough to look up or down. */
+  lookPitchLimit: Math.PI / 2,
 };
 
 export function setStickDeadZone(value: number): number {
