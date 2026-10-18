@@ -9,6 +9,7 @@ import {
   type AbilityId,
 } from "./catalog";
 import { clampDt } from "./clock";
+import { spinRules } from "./specials";
 import type { TurtleMotion } from "../movement/stepTurtle";
 
 /**
@@ -29,10 +30,16 @@ export interface RacerEffects {
   waveWindowRemaining: number;
   waveBoostRemaining: number;
   trailRemaining: number;
+  /** Kempy's spin dash. While this is above zero every hit is ignored. */
+  spinRemaining: number;
+  /** The turtle cannot move while this is above zero. A body slam does this to a rival. */
+  stunRemaining: number;
 }
 
 export interface AbilityLoadout {
   held: AbilityId | null;
+  /** A second stored ability, used only by turtles with two item slots. It moves up when `held` is spent. */
+  spare: AbilityId | null;
   effects: RacerEffects;
 }
 
@@ -46,6 +53,8 @@ export function createEffects(): RacerEffects {
     waveWindowRemaining: 0,
     waveBoostRemaining: 0,
     trailRemaining: 0,
+    spinRemaining: 0,
+    stunRemaining: 0,
   };
 }
 
@@ -53,6 +62,7 @@ export function createEffects(): RacerEffects {
 export function createLoadout(): AbilityLoadout {
   return {
     held: null,
+    spare: null,
     effects: createEffects(),
   };
 }
@@ -66,6 +76,10 @@ export function isEligibleHit(kind: HitKind): boolean {
  * A second call, or an environment hit, leaves the racer unprotected only if the charge is already gone.
  */
 export function absorbHit(effects: RacerEffects, kind: HitKind): { effects: RacerEffects; blocked: boolean } {
+  // A spinning turtle shrugs everything off and keeps its shell charge for later.
+  if (isEligibleHit(kind) && effects.spinRemaining > 0) {
+    return { effects, blocked: true };
+  }
   if (!isEligibleHit(kind) || effects.shieldCharges < 1 || effects.shieldRemaining <= 0) {
     return { effects, blocked: false };
   }
@@ -122,9 +136,16 @@ export function speedModifiers(effects: RacerEffects): CrawlModifiers {
     maxSpeedMultiplier *= waveRules.maxSpeedMultiplier;
     accelerationMultiplier *= waveRules.accelerationMultiplier;
   }
+  if (effects.spinRemaining > 0) {
+    maxSpeedMultiplier *= spinRules.maxSpeedMultiplier;
+    accelerationMultiplier *= spinRules.accelerationMultiplier;
+  }
   if (effects.slowRemaining > 0) {
     maxSpeedMultiplier *= sandRules.slowMultiplier;
     accelerationMultiplier *= sandRules.slowMultiplier;
+  }
+  if (effects.stunRemaining > 0) {
+    maxSpeedMultiplier = 0;
   }
   return { maxSpeedMultiplier, accelerationMultiplier };
 }
@@ -141,6 +162,8 @@ export function stepEffects(effects: RacerEffects, dt: number): RacerEffects {
     waveWindowRemaining: Math.max(0, effects.waveWindowRemaining - step),
     waveBoostRemaining: Math.max(0, effects.waveBoostRemaining - step),
     trailRemaining: Math.max(0, effects.trailRemaining - step),
+    spinRemaining: Math.max(0, effects.spinRemaining - step),
+    stunRemaining: Math.max(0, effects.stunRemaining - step),
   };
 }
 
@@ -182,7 +205,8 @@ export function beginAbility(
   const rules = abilityCatalog[ability];
   const spent: AbilityLoadout = {
     ...loadout,
-    held: null,
+    held: loadout.spare,
+    spare: null,
   };
   if (ability === "flipper-frenzy") {
     return {

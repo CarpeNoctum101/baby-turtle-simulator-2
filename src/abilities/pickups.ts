@@ -50,7 +50,8 @@ export interface PickupResult {
 }
 
 /**
- * The turtle can hold one ability. A second orb is left on the sand until the slot is empty.
+ * A turtle holds as many abilities as it has item slots (one by default, none for Snappy).
+ * An orb is left on the sand while every slot is full.
  * An orb that was just collected stays gone until its respawn timer finishes.
  */
 export function collectTideOrbs(
@@ -59,8 +60,10 @@ export function collectTideOrbs(
   racer: { x: number; z: number },
   random: () => number,
   pool: readonly AbilityId[],
+  itemSlots = 1,
 ): PickupResult {
-  if (loadout.held !== null) {
+  const full = itemSlots <= 0 || (loadout.held !== null && (itemSlots < 2 || loadout.spare !== null));
+  if (full) {
     return { orbs: orbs.map((orb) => ({ ...orb })), loadout, granted: null };
   }
 
@@ -74,7 +77,7 @@ export function collectTideOrbs(
   const granted = rollAbility(random, pool);
   return {
     granted,
-    loadout: { ...loadout, held: granted },
+    loadout: loadout.held === null ? { ...loadout, held: granted } : { ...loadout, spare: granted },
     orbs: orbs.map((orb, orbIndex) => (orbIndex === index ? { ...orb, respawnIn: orbRespawnSeconds } : { ...orb })),
   };
 }

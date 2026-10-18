@@ -88,6 +88,40 @@ function playCue(ctx: AudioContext, cue: AbilityCue): void {
     tone(ctx, 196, now, 0.12, "sine", 0.04);
     return;
   }
+  if (cue === "gull-hit") {
+    tone(ctx, 1400, now, 0.08, "sawtooth", 0.05);
+    tone(ctx, 900, now + 0.07, 0.12, "sawtooth", 0.05);
+    return;
+  }
+  if (cue === "gull-swoop") {
+    tone(ctx, 1100, now, 0.1, "sawtooth", 0.04);
+    tone(ctx, 1500, now + 0.09, 0.14, "sawtooth", 0.04);
+    tone(ctx, 1000, now + 0.22, 0.18, "sawtooth", 0.04);
+    return;
+  }
+  if (cue === "slam") {
+    tone(ctx, 70, now, 0.2, "sawtooth", 0.07);
+    return;
+  }
+  if (cue === "slam-hit") {
+    tone(ctx, 110, now, 0.1, "square", 0.07);
+    tone(ctx, 55, now + 0.05, 0.18, "sawtooth", 0.07);
+    return;
+  }
+  if (cue === "spin") {
+    tone(ctx, 300, now, 0.1, "triangle", 0.05);
+    tone(ctx, 600, now + 0.08, 0.14, "triangle", 0.05);
+    tone(ctx, 900, now + 0.16, 0.16, "triangle", 0.04);
+    return;
+  }
+  if (cue === "snap") {
+    tone(ctx, 300, now, 0.05, "square", 0.04);
+    return;
+  }
+  if (cue === "snap-hit") {
+    tone(ctx, 140, now, 0.1, "sawtooth", 0.06);
+    return;
+  }
   tone(ctx, 660, now, 0.08, "sine", 0.04);
   tone(ctx, 880, now + 0.1, 0.12, "sine", 0.03);
 }

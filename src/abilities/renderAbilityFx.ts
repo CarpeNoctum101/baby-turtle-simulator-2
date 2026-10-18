@@ -76,7 +76,7 @@ export function createAbilityFx(scene: Scene, playerVisual: TransformNode): Abil
       shield.scaling.set(pop, pop, pop);
 
       paintTurtle(frame.playerSkin, frame.playerShell, frame.playerEffects.frenzyRemaining > 0, shellUp, frame.time, false);
-      paintTurtle(frame.rivalSkin, frame.rivalShell, false, false, frame.time, frame.rivalEffects.slowRemaining > 0);
+      paintTurtle(frame.rivalSkin, frame.rivalShell, false, false, frame.time, frame.rivalEffects.slowRemaining > 0 || frame.rivalEffects.stunRemaining > 0);
 
       const pulse = frame.waveArmed ? 0.35 + Math.sin(frame.time * 8) * 0.2 : 0.12;
       wave.emissiveColor.set(frame.waveBoost ? 0.35 : 0.05, frame.waveBoost ? 0.55 : 0.25 + pulse, frame.waveBoost ? 0.7 : 0.4);

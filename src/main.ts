@@ -32,6 +32,19 @@ const startOnlineButton = document.querySelector<HTMLButtonElement>("#startOnlin
 const leaveRoomButton = document.querySelector<HTMLButtonElement>("#leaveRoom");
 const inputDevices = document.querySelector<HTMLFieldSetElement>("#inputChoice");
 
+const byId = (id: string) => document.querySelector<HTMLElement>(`#${id}`);
+const healthHud = byId("healthHud");
+const healthLabel = byId("healthLabel");
+const healthFill = byId("healthFill");
+const rivalHealthLabel = byId("rivalHealthLabel");
+const rivalHealthFill = byId("rivalHealthFill");
+const abilitySpare = byId("abilitySpare");
+const abilitySpareIcon = byId("abilitySpareIcon");
+const snapHud = byId("snapHud");
+const snapLabel = byId("snapLabel");
+const snapFill = byId("snapFill");
+const typePickers = Array.from(document.querySelectorAll<HTMLElement>(".typePicker"));
+
 const ui: GameUi | null =
   canvas &&
   hud &&
@@ -63,6 +76,16 @@ const ui: GameUi | null =
   startOnlineButton &&
   leaveRoomButton &&
   inputDevices
+  healthHud &&
+  healthLabel &&
+  healthFill &&
+  rivalHealthLabel &&
+  rivalHealthFill &&
+  abilitySpare &&
+  abilitySpareIcon &&
+  snapHud &&
+  snapLabel &&
+  snapFill
     ? {
         hud,
         hudToggle,
@@ -93,6 +116,17 @@ const ui: GameUi | null =
         startOnlineButton,
         leaveRoomButton,
         inputDevices,
+        healthHud,
+        healthLabel,
+        healthFill,
+        rivalHealthLabel,
+        rivalHealthFill,
+        abilitySpare,
+        abilitySpareIcon,
+        snapHud,
+        snapLabel,
+        snapFill,
+        typePickers,
       }
     : null;
 
