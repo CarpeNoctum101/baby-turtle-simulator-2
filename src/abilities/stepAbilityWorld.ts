@@ -1,4 +1,5 @@
 import { absorbHit, beginAbility, createEffects, createLoadout, resolveWaveWindow, stepLoadout, type AbilityLoadout, type RacerEffects } from "./abilityState";
+import { clampDt } from "./clock";
 import type { AbilityId } from "./catalog";
 import { abilityCatalog, collisionSpeedScale } from "./catalog";
 import { applyDamage, createHealth, damageRules, type Health } from "./health";
@@ -12,6 +13,7 @@ import {
   stepSeagull,
   strikeSeagull,
   stunSeagull,
+  trapSeagull,
   type Seagull,
   type Vec2,
 } from "../mob/seagull";
@@ -34,11 +36,13 @@ import {
 import { createSnap, snapRules, stepSnap, trySnap, type SnapState } from "./snap";
 import { createContactBook, resolveCollisions, stepContactBook, type ContactBook } from "./contacts";
 import { collectTideOrbs, createTideOrbs, stepTideOrbs, type TideOrb } from "./pickups";
+import { bubbleRules, consumeBubbleHits, launchBubble, stepBubbleShots, type BubbleShot } from "./bubble";
 import { createSandCloud, ownCloudRemaining, resolveSandClouds, stepSandClouds, type SandCloud } from "./sandSpray";
 import type { TurtleMotion } from "../movement/stepTurtle";
 import { catchInNet, createNetHazards, netRules, stepNetHazards, type NetHazards, type NetThrowerSpawn } from "../mob/netThrower";
 
-export type AbilityCue = "pickup" | "frenzy" | "shield" | "spray" | "block" | "bump" | "wave-arm" | "wave-boost" | "wave-miss" | "trail" | "snap" | "snap-hit" | "gull-hit" | "gull-swoop" | "slam" | "slam-hit" | "spin" | "net-catch";
+
+export type AbilityCue = "pickup" | "frenzy" | "shield" | "spray" | "block" | "bump" | "wave-arm" | "wave-boost" | "wave-miss" | "trail" | "snap" | "snap-hit" | "gull-hit" | "gull-swoop" | "slam" | "slam-hit" | "spin" | "net-catch" | "bubble" | "bubble-trap";
 
 /** Everything the ability rules remember between frames, apart from the meshes. */
 export interface AbilityWorld {
@@ -57,6 +61,9 @@ export interface AbilityWorld {
   nets: NetHazards;
   /** Speed of the push the turtle is still sliding from. */
   playerKnock: Vec2;
+  bubbles: BubbleShot[];
+  /** Seconds until another bubble can be fired. */
+  bubbleCooldown: number;
 }
 
 export const defaultMaxHealth = 50;
@@ -70,6 +77,8 @@ export function createAbilityWorld(
     seagulls: spawns.map((spawn) => createSeagull(spawn.id, spawn.home, spawn.flier)),
     nets: createNetHazards(netSpawns),
     playerKnock: { x: 0, z: 0 },
+    bubbles: [],
+    bubbleCooldown: 0,
     playerHealth: createHealth(maxHealth),
     rivalHealth: createHealth(defaultMaxHealth),
     snap: createSnap(),
@@ -99,6 +108,11 @@ export interface AbilityTick {
   special?: SpecialId | null;
   /** True on the frame the special button goes down. */
   specialPressed?: boolean;
+  /** True on the frame the bubble button goes down. */
+  shoot?: boolean;
+  /** Camera forward on the ground. The bubble travels this way. */
+  aimX?: number;
+  aimZ?: number;
 }
 
 export interface AbilityTickResult {
@@ -135,6 +149,8 @@ export function stepAbilityWorld(world: AbilityWorld, tick: AbilityTick): Abilit
   let slam = world.slam;
   let spin = world.spin;
   let seagulls = world.seagulls;
+  let bubbles = world.bubbles;
+  let bubbleCooldown = Math.max(0, world.bubbleCooldown - clampDt(tick.dt));
   const frozen = world.seagulls.some((gull) => isRescuePhase(gull.phase));
 
   if (tick.racing && !frozen) {
@@ -284,6 +300,44 @@ export function stepAbilityWorld(world: AbilityWorld, tick: AbilityTick): Abilit
     cues.push("bump");
   }
 
+  if (tick.racing && !frozen && tick.shoot && bubbleCooldown <= 0) {
+    const shot = launchBubble(player.x, player.z, tick.aimX ?? 0, tick.aimZ ?? 1);
+    if (shot) {
+      bubbles = [...bubbles, shot];
+      bubbleCooldown = bubbleRules.cooldown;
+      cues.push("bubble");
+    }
+  }
+  if (tick.racing) {
+    bubbles = stepBubbleShots(bubbles, tick.dt);
+    const caught = consumeBubbleHits(bubbles, [
+      { id: "rival", x: rival.x, z: rival.z, y: 0.4 },
+      ...seagulls
+        .filter((gull) => !isRescuePhase(gull.phase))
+        .map((gull) => ({ id: gull.id, x: gull.x, z: gull.z, y: gull.y })),
+    ]);
+    bubbles = caught.shots;
+    for (const id of caught.hits) {
+      if (id === "rival") {
+        const absorbed = absorbHit(rivalEffects, "ability");
+        rivalEffects = absorbed.effects;
+        if (absorbed.blocked) {
+          cues.push("block");
+        } else {
+          rivalEffects = { ...rivalEffects, bubbleRemaining: bubbleRules.trapSeconds };
+          rival = { ...rival, speed: 0 };
+          cues.push("bubble-trap");
+        }
+        continue;
+      }
+      const before = seagulls.find((gull) => gull.id === id);
+      seagulls = seagulls.map((gull) => (gull.id === id ? trapSeagull(gull, bubbleRules.trapSeconds) : gull));
+      if (before && !isRescuePhase(before.phase)) {
+        cues.push("bubble-trap");
+      }
+    }
+  }
+
   let playerKnock = world.playerKnock;
   let playerShift: Vec2 = { x: 0, z: 0 };
   let playerLift = 0;
@@ -322,7 +376,7 @@ export function stepAbilityWorld(world: AbilityWorld, tick: AbilityTick): Abilit
     const stillFrozen = seagulls.some((gull) => isRescuePhase(gull.phase));
     if (playerHealth.current <= 0 && !stillFrozen && seagulls.length > 0) {
       // A stunned gull cannot answer the call. If every gull is stunned the rescue waits for one to recover.
-      const able = seagulls.filter((gull) => gull.phase !== "stunned");
+      const able = seagulls.filter((gull) => gull.phase !== "stunned" && gull.bubble <= 0);
       const nearest = able.reduce<Seagull | null>(
         (best, gull) =>
           !best || Math.hypot(gull.x - player.x, gull.z - player.z) < Math.hypot(best.x - player.x, best.z - player.z) ? gull : best,
@@ -396,6 +450,8 @@ export function stepAbilityWorld(world: AbilityWorld, tick: AbilityTick): Abilit
       seagulls,
       nets,
       playerKnock,
+      bubbles,
+      bubbleCooldown,
     },
   };
 }

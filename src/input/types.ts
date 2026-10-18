@@ -33,6 +33,8 @@ export interface StickMapping {
   abilityButton: number | null;
   /** Null when this layout does not assign the snap button. Standard pads use Y. */
   snapButton: number | null;
+  /** Null when this layout does not assign the bubble button. Standard pads use RT. */
+  shootButton: number | null;
   /** Standard pads report "stick up" as a negative number. */
   invertThrottle: boolean;
   /** Stick right should yaw the camera the same way as moving the mouse right. */

@@ -6,6 +6,7 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { Scene } from "@babylonjs/core/scene";
 import type { RacerEffects } from "./abilityState";
+import type { BubbleShot } from "./bubble";
 import { debrisLayout } from "./contacts";
 import type { TideOrb } from "./pickups";
 import { createItemBoxes } from "./createItemBoxes";
@@ -30,6 +31,9 @@ export interface AbilityFxFrame {
   playerShell: PlaceholderTurtle["shell"];
   rivalSkin: PlaceholderTurtle["skin"];
   rivalShell: PlaceholderTurtle["shell"];
+  bubbles: readonly BubbleShot[];
+  /** Bubbles closed around a trapped turtle or seagull. */
+  traps: readonly { x: number; y: number; z: number }[];
 }
 
 export interface AbilityFx {
@@ -45,6 +49,8 @@ export function createAbilityFx(scene: Scene, playerVisual: TransformNode): Abil
   const shield = createShield(scene, playerVisual);
   const wave = createWaveBand(scene);
   const trail = createTrail(scene);
+  const bubbleShots = createBubbleMeshes(scene, "bubbleShot", 4, 0.55);
+  const bubbleTraps = createBubbleMeshes(scene, "bubbleTrap", 5, 1.7);
   createDebris(scene);
 
   return {
@@ -79,7 +85,16 @@ export function createAbilityFx(scene: Scene, playerVisual: TransformNode): Abil
       shield.scaling.set(pop, pop, pop);
 
       paintTurtle(frame.playerSkin, frame.playerShell, frame.playerEffects.frenzyRemaining > 0, shellUp, frame.time, false);
-      paintTurtle(frame.rivalSkin, frame.rivalShell, false, false, frame.time, frame.rivalEffects.slowRemaining > 0 || frame.rivalEffects.stunRemaining > 0);
+      paintTurtle(
+        frame.rivalSkin,
+        frame.rivalShell,
+        false,
+        false,
+        frame.time,
+        frame.rivalEffects.slowRemaining > 0 || frame.rivalEffects.stunRemaining > 0 || frame.rivalEffects.bubbleRemaining > 0,
+      );
+      placeBubbles(bubbleShots, frame.bubbles, 0.55, frame.time);
+      placeBubbles(bubbleTraps, frame.traps, 0, frame.time);
 
       const pulse = frame.waveArmed ? 0.35 + Math.sin(frame.time * 8) * 0.2 : 0.12;
       wave.emissiveColor.set(frame.waveBoost ? 0.35 : 0.05, frame.waveBoost ? 0.55 : 0.25 + pulse, frame.waveBoost ? 0.7 : 0.4);
@@ -165,6 +180,40 @@ function createTrail(scene: Scene): Mesh[] {
     marker.isVisible = false;
     return marker;
   });
+}
+
+function createBubbleMeshes(scene: Scene, name: string, count: number, diameter: number): Mesh[] {
+  const material = new StandardMaterial(`${name}Material`, scene);
+  material.diffuseColor = new Color3(0.62, 0.86, 0.95);
+  material.emissiveColor = new Color3(0.25, 0.55, 0.7);
+  material.specularColor = new Color3(0.4, 0.45, 0.5);
+  material.alpha = 0.38;
+  material.transparencyMode = Material.MATERIAL_ALPHABLEND;
+  material.backFaceCulling = false;
+  return Array.from({ length: count }, (_, index) => {
+    const mesh = MeshBuilder.CreateSphere(`${name}${index}`, { diameter, segments: 12 }, scene);
+    mesh.material = material;
+    mesh.isVisible = false;
+    return mesh;
+  });
+}
+
+function placeBubbles(
+  meshes: readonly Mesh[],
+  spots: readonly { x: number; y?: number; z: number }[],
+  fallbackY: number,
+  time: number,
+): void {
+  for (const [index, mesh] of meshes.entries()) {
+    const spot = spots[index];
+    mesh.isVisible = spot !== undefined;
+    if (!spot) {
+      continue;
+    }
+    const bob = 1 + Math.sin(time * 7 + index) * 0.04;
+    mesh.position.set(spot.x, spot.y ?? fallbackY, spot.z);
+    mesh.scaling.setAll(bob);
+  }
 }
 
 function createDebris(scene: Scene): void {

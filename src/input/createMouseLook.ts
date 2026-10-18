@@ -7,6 +7,8 @@ export interface MouseDelta {
 
 export interface MouseLook {
   pointerLocked: boolean;
+  /** True while the left mouse button is held. That button fires a bubble. */
+  shooting: boolean;
   consume: () => MouseDelta;
   dispose: () => void;
 }
@@ -19,12 +21,17 @@ export function createMouseLook(canvas: HTMLCanvasElement): MouseLook {
   let pendingYaw = 0;
   let pendingPitch = 0;
   let looking = false;
+  let shooting = false;
 
   const onContextMenu = (event: Event) => {
     event.preventDefault();
   };
 
   const onPointerDown = (event: PointerEvent) => {
+    if (event.button === 0) {
+      shooting = true;
+      canvas.focus();
+    }
     if (event.button !== 2) {
       return;
     }
@@ -33,6 +40,9 @@ export function createMouseLook(canvas: HTMLCanvasElement): MouseLook {
   };
 
   const onPointerUp = (event: PointerEvent) => {
+    if (event.button === 0) {
+      shooting = false;
+    }
     if (event.button === 2) {
       looking = false;
     }
@@ -40,6 +50,7 @@ export function createMouseLook(canvas: HTMLCanvasElement): MouseLook {
 
   const onBlur = () => {
     looking = false;
+    shooting = false;
   };
 
   const onMouseMove = (event: MouseEvent) => {
@@ -62,6 +73,9 @@ export function createMouseLook(canvas: HTMLCanvasElement): MouseLook {
     get pointerLocked() {
       return looking;
     },
+    get shooting() {
+      return shooting;
+    },
     consume() {
       const delta = { yawDelta: pendingYaw, pitchDelta: pendingPitch };
       pendingYaw = 0;
@@ -75,6 +89,7 @@ export function createMouseLook(canvas: HTMLCanvasElement): MouseLook {
       window.removeEventListener("blur", onBlur);
       window.removeEventListener("mousemove", onMouseMove);
       looking = false;
+      shooting = false;
     },
   };
 }

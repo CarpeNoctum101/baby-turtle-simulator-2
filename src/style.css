@@ -15,6 +15,59 @@ body {
   outline: none;
 }
 
+#crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 3;
+  width: 22px;
+  height: 22px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+#crosshair[hidden] {
+  display: none;
+}
+
+#crosshair[data-ready="false"] {
+  opacity: 0.35;
+}
+
+#crosshair span {
+  position: absolute;
+  background: #f4fbff;
+  box-shadow: 0 0 0 1px rgba(20, 40, 48, 0.55);
+}
+
+#crosshair span:nth-child(1) {
+  left: 10px;
+  top: 0;
+  width: 2px;
+  height: 6px;
+}
+
+#crosshair span:nth-child(2) {
+  left: 10px;
+  bottom: 0;
+  width: 2px;
+  height: 6px;
+}
+
+#crosshair span:nth-child(3) {
+  top: 10px;
+  left: 0;
+  width: 6px;
+  height: 2px;
+}
+
+#crosshair span:nth-child(4) {
+  top: 10px;
+  right: 0;
+  width: 6px;
+  height: 2px;
+}
+
 #hudToggle {
   position: absolute;
   top: 12px;

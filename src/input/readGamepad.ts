@@ -22,6 +22,8 @@ export interface GamepadReading {
   ability: boolean;
   /** Standard pads report Y. Other layouts leave this false. */
   snap: boolean;
+  /** Standard pads report RT. Other layouts leave this false. */
+  shoot: boolean;
   pressedButtons: PressedButton[];
   axes: number[];
 }
@@ -39,6 +41,7 @@ export const emptyGamepadReading: GamepadReading = {
   brake: false,
   ability: false,
   snap: false,
+  shoot: false,
   pressedButtons: [],
   axes: [],
 };
@@ -50,6 +53,7 @@ export function readGamepadSnapshot(snapshot: GamepadSnapshot, deadZone: number,
   const brake = brakeButton !== null && snapshot.buttons[brakeButton]?.pressed === true;
   const ability = abilityButton !== null && snapshot.buttons[abilityButton]?.pressed === true;
   const snap = stickMapping.snapButton !== null && snapshot.buttons[stickMapping.snapButton]?.pressed === true;
+  const shoot = stickMapping.shootButton !== null && snapshot.buttons[stickMapping.shootButton]?.pressed === true;
   const move = shapeStick(
     axis(snapshot.axes, stickMapping.steerAxis),
     axis(snapshot.axes, stickMapping.throttleAxis),
@@ -78,6 +82,7 @@ export function readGamepadSnapshot(snapshot: GamepadSnapshot, deadZone: number,
     brake,
     ability,
     snap,
+    shoot,
     pressedButtons: snapshot.buttons
       .map((button, index) => ({ index, value: button.value, pressed: button.pressed }))
       .filter((button) => button.pressed || button.value > 0.15)

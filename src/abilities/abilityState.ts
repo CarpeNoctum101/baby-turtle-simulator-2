@@ -34,6 +34,8 @@ export interface RacerEffects {
   spinRemaining: number;
   /** The turtle cannot move while this is above zero. A body slam does this to a rival. */
   stunRemaining: number;
+  /** A bubble holds the turtle in place. It wears off on its own. */
+  bubbleRemaining: number;
 }
 
 export interface AbilityLoadout {
@@ -55,6 +57,7 @@ export function createEffects(): RacerEffects {
     trailRemaining: 0,
     spinRemaining: 0,
     stunRemaining: 0,
+    bubbleRemaining: 0,
   };
 }
 
@@ -144,7 +147,7 @@ export function speedModifiers(effects: RacerEffects): CrawlModifiers {
     maxSpeedMultiplier *= sandRules.slowMultiplier;
     accelerationMultiplier *= sandRules.slowMultiplier;
   }
-  if (effects.stunRemaining > 0) {
+  if (effects.stunRemaining > 0 || effects.bubbleRemaining > 0) {
     maxSpeedMultiplier = 0;
   }
   return { maxSpeedMultiplier, accelerationMultiplier };
@@ -164,6 +167,7 @@ export function stepEffects(effects: RacerEffects, dt: number): RacerEffects {
     trailRemaining: Math.max(0, effects.trailRemaining - step),
     spinRemaining: Math.max(0, effects.spinRemaining - step),
     stunRemaining: Math.max(0, effects.stunRemaining - step),
+    bubbleRemaining: Math.max(0, effects.bubbleRemaining - step),
   };
 }
 
