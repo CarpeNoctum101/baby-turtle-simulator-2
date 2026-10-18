@@ -9,7 +9,8 @@ import { oceanTrail } from "../abilities/trail";
 import { createRemoteSample, pushRemoteSample, stepRemoteSample, type RemoteSample, type SamplePose } from "../../shared/interpolatePose";
 import type { PoseMessage, PublicPlayer } from "../../shared/protocol";
 import { stepTurtleAnimation, type TurtleAnimation } from "../turtle/animateTurtle";
-import { createPlaceholderTurtle, type PlaceholderTurtle } from "../turtle/createPlaceholderTurtle";
+import type { PlaceholderTurtle } from "../turtle/createPlaceholderTurtle";
+import { createOceanTurtle } from "../turtle/createOceanTurtle";
 
 const slotColors = [
   { skin: new Color3(0.42, 0.55, 0.28), shell: new Color3(0.45, 0.28, 0.14) },
@@ -58,10 +59,9 @@ export function createRemoteTurtles(scene: Scene) {
     const paint = slotColors[player.slot] ?? slotColors[0];
     const pose = poseOf(player);
     const bodyId = remoteBodyId(player);
-    const body = createPlaceholderTurtle(scene, {
+    const body = createOceanTurtle(scene, {
       id: bodyId,
-      skin: paint.skin,
-      shell: paint.shell,
+      tint: Color3.Lerp(Color3.White(), paint.shell, 0.22),
     });
     const trail = createTrail(scene, bodyId);
     const remote: RemoteTurtle = {

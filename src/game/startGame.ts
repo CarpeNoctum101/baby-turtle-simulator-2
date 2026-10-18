@@ -1,5 +1,4 @@
 import { Engine } from "@babylonjs/core/Engines/engine";
-import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Scene } from "@babylonjs/core/scene";
 import { applySandSlow, createEffects, isTrailVisible, resolveWaveWindow, speedModifiers, stepLoadout, type AbilityLoadout, type RacerEffects } from "../abilities/abilityState";
 import { abilityCatalog, raceAbilityPool, sandRules, shellRules, type AbilityId } from "../abilities/catalog";
@@ -46,8 +45,9 @@ import { createRivalMotion, raceStanding, stepRival } from "../race/stepRival";
 import { createBeachScene } from "../scene/createBeachScene";
 import { createSpaceEnding } from "../scene/ending/createSpaceEnding";
 import { stepTurtleAnimation, type TurtleAnimation } from "../turtle/animateTurtle";
-import { createDetailedTurtle } from "../turtle/createDetailedTurtle";
-import { createPlaceholderTurtle, type PlaceholderTurtle } from "../turtle/createPlaceholderTurtle";
+import type { PlaceholderTurtle } from "../turtle/createPlaceholderTurtle";
+import { createOceanTurtle } from "../turtle/createOceanTurtle";
+import { createSculptedTurtle } from "../turtle/createSculptedTurtle";
 import { defaultTurtleType, scaleCrawl, turtleTypeList, turtleTypes, type TurtleTypeId } from "../turtle/turtleTypes";
 import { createEndingState, sampleEnding, stepEnding, type EndingPhase, type EndingState } from "./endingState";
 
@@ -109,15 +109,11 @@ const inputChoiceKey = "baby-turtle-input";
  * A local race uses turtle types, health, specials and seagulls on this computer.
  * An online race lets the server own the countdown, Tide Orbs, abilities and finish order.
  */
-export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = false): RunningGame {
+export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = false, turtleModel: "ocean" | "tmnt" = "ocean"): RunningGame {
   const engine = new Engine(canvas, true, { adaptToDeviceRatio: true });
   const scene = createBeachScene(engine, beachPreview);
-  const turtle = beachPreview ? createDetailedTurtle(scene) : createPlaceholderTurtle(scene);
-  const rivalTurtle = createPlaceholderTurtle(scene, {
-    id: "rival",
-    skin: new Color3(0.55, 0.62, 0.4),
-    shell: new Color3(0.25, 0.4, 0.48),
-  });
+  const turtle = turtleModel === "tmnt" ? createSculptedTurtle(scene) : createOceanTurtle(scene);
+  const rivalTurtle = turtleModel === "tmnt" ? createSculptedTurtle(scene, { id: "rival", redMask: true }) : createOceanTurtle(scene, { id: "rival" });
   const camera = createFollowCamera(scene);
   // Keep camera-relative forward aimed at the finish in both course views.
   const initialLook: LookOffsets = { yaw: 0, pitch: beachPreview ? 0.22 : 0 };
@@ -723,11 +719,12 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     if (pressedOnce("Enter") && !online && (!ending || sampleEnding(ending).phase === "space")) {
       beginFromMenu();
     }
-    if (pressedOnce("KeyR") && online && onlinePhase === "lobby") {
+    const restartPressed = pressedOnce("KeyR");
+    if (restartPressed && online && onlinePhase === "lobby") {
       motion = { x: home.x, z: home.z, heading: home.heading, speed: 0, steer: 0 };
       placeTurtle(turtle, motion);
       session?.sendReset();
-    } else if (pressedOnce("KeyR") && !online && race.phase !== "ready") {
+    } else if (restartPressed && !online && race.phase !== "ready") {
       restartRace();
     }
 
@@ -883,11 +880,13 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     turtle.setHeadReach(turtleType.neckLength + (endingFrame ? 0 : lungeExtension(world.snap)));
     stepTurtleAnimation(animation, turtle.visual, turtle.flippers, playerSpeed, dt,
       !endingFrame && world.loadout.effects.frenzyRemaining > 0);
-    if (endingFrame?.phase === "boarding") {
-      const tuck = Math.min(1, endingFrame.phaseTime / 0.5);
+    const tuck = endingFrame?.phase === "boarding" ? 1
+      : endingFrame?.phase === "walking" ? Math.max(0, (endingFrame.walkProgress - 0.9) / 0.1) : 0;
+    if (tuck > 0) {
       for (const flipper of turtle.flippers) {
-        flipper.mesh.rotation.y = flipper.baseY + (flipper.side * 1.4 - flipper.baseY) * tuck;
+        flipper.mesh.rotation.y = flipper.baseY + ((flipper.boardingY ?? flipper.side * 1.4) - flipper.baseY) * tuck;
         flipper.mesh.rotation.z *= 1 - tuck;
+        flipper.mesh.rotation.x *= 1 - tuck;
       }
     }
     stepTurtleAnimation(rivalAnimation, rivalTurtle.visual, rivalTurtle.flippers, canDrive(race.phase) ? rival.speed : 0, dt, false);

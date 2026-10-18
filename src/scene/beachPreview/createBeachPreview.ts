@@ -40,7 +40,7 @@ export function createBeachPreview(scene: Scene, sun: DirectionalLight, fill: He
   createAtmosphere(scene, sunDirection);
 
   // Replace only the preview's visual blocks. Logical surface/finish coordinates stay intact.
-  for (const name of ["surroundingSand", "drySand", "wetSand", "shallowWater", "finishZone", "rightBerm", "leftBerm", "nest"]) {
+  for (const name of ["surroundingSand", "drySand", "wetSand", "shallowWater", "finishZone", "rightBerm", "leftBerm", "nest", "startPad-left", "startPad-center", "startPad-right"]) {
     scene.getMeshByName(name)?.setEnabled(false);
   }
   for (const mesh of scene.meshes) if (mesh.name.startsWith("pebble")) mesh.setEnabled(false);
@@ -82,9 +82,9 @@ export function createBeachPreview(scene: Scene, sun: DirectionalLight, fill: He
   shadows.setDarkness(0.12);
   // Wait for the caller's turtle to exist. Instances share source geometry/materials.
   scene.onBeforeRenderObservable.addOnce(() => {
-    const turtle = scene.getTransformNodeByName("turtle");
+    const racers = [scene.getTransformNodeByName("turtle"), scene.getTransformNodeByName("rival")];
     for (const mesh of scene.meshes) {
-      const isTurtle = !!turtle && mesh.isDescendantOf(turtle);
+      const isTurtle = racers.some(racer => !!racer && mesh.isDescendantOf(racer));
       if (mesh.isEnabled() && (isTurtle || /^(palm|previewRock|previewDriftwood|previewGrass)/.test(mesh.name))) {
         shadows.addShadowCaster(mesh, false);
         // receiveShadows is per mesh. Instances do not inherit it from the source.

@@ -158,3 +158,64 @@ The development tab was refreshed and left at the nest, ready to play.
 
 New screenshots: `docs/starship-emerging.jpg`, `docs/starship-walkway.jpg`.
 Boarding, launch and orbit screenshots were refreshed without action captions.
+
+
+## Blender turtle, item boxes, stable ending deck and flapping birds on main
+
+- Integrated the earlier saved asset work into the newer main branch without replacing
+  its local/online race logic, turtle types, health, specials or seagull behavior.
+- The active player, practice rival and remote racer factory now use **Ocean Turtle
+  by der_On, CC BY 3.0**, from the user-supplied Ocean Turtle.zip. The original archive
+  stays intact. Full attribution/adaptation notes are in public/credits/ocean-turtle.txt
+  and linked from the start screen. No new asset-generation service was used.
+- Recovered the free-Blender conversion recipe and native Babylon assets. Four meshes
+  total 9,096 triangles per racer. Painted color/eyelid textures retain the original UVs;
+  Blender bakes the older object-space normal map into tangent space. Runtime asset
+  files total about 2.67 MB before HTTP compression. An independent six-bone rig per
+  racer uses at most two weights per vertex: body, four flippers and a sliding head.
+  Snappy's existing neck/snap stretches the imported neck and moves eyes/eyelids with it.
+- Preserved the procedural TMNT model, materials, tests and screenshots for future
+  reference. ?turtle=tmnt selects it, and course links preserve that option. Its head
+  rig also supports the newer neck interface. No Nintendo/Prime 1 models were imported.
+- Restored the original Mario Kart-style question-mark boxes, shared procedural
+  128x128 face texture and instanced cube/edge geometry. Preserved pickup IDs, positions,
+  random abilities, inventory slots, radius and nine-second respawn, including the
+  existing online protocol. Player instructions now call them item boxes.
+- Fixed the ending regression: the walkway and dock settle at y=0.42, above the wave
+  maximum y=0.12. The turtle rises smoothly with the final lift movement. The ending
+  hides race water/finish surfaces while its horizon ocean is visible, and restart
+  restores their original visibility. Near clip 0.2 improves depth precision. The hatch
+  is 1.6 units wide so the larger Leatherback model clears it with folded flippers.
+- The existing licensed seagull GLB has no bones or animation clips. Added weighted
+  shoulder/wing pairs to its actual feathered mesh, prepared once per bird. A five-bone
+  rig unfolds and flaps the wings in flight, holds them steadier in dives, and folds them
+  when perched/stunned. Head/feet and unweighted body vertices stay fixed. The plain
+  fallback bird also flaps. Existing chase, dive, hit and rescue rules are unchanged.
+  A developer-only wing-preview.html page uses the exact game model/rig for close-ups.
+- Automated: 37 files / 212 tests pass. Coverage includes finite meshes/UVs/normals,
+  normalized skin weights, geometry budgets, actual flipper and wing deformation,
+  independent racers, Snappy head/eye travel, large-turtle hatch clearance, item-box
+  pickup/respawn, and ability glow. Client TypeScript, server TypeScript and Vite build
+  pass. The existing large-chunk warning remains (main bundle about 2.69 MB / 704 kB
+  gzip). Installed the dependencies already declared in the main branch's lockfile;
+  package.json and package-lock.json were not changed.
+- Browser: checked the imported racer, item boxes and airborne birds in the race.
+  Compared two visibly different wingbeat poses and a folded perched pose in the
+  close-up page; the dive pose was also inspected. Completed a beach race through
+  launch/space/results and rematch. Captured emergence and consecutive walking frames:
+  the settled walkway remained opaque above the sea. On the original course, selected
+  Snappy, collected a box, activated Magnetic Sense and used the snap move; both HUD
+  timers appeared. No console warnings/errors were observed. Physical controller,
+  actual multiplayer connections, deployment and low-end performance remain untested.
+
+Proof: docs/platform-emerging-fixed.jpg, docs/platform-settled-a.jpg,
+docs/platform-settled-b.jpg, docs/bird-wingbeat-a.jpg, docs/bird-wingbeat-b.jpg.
+Local commands and the free Blender regeneration command are documented in README.md.
+
+Final browser follow-up: the original course's settled deck also stayed opaque.
+Fixed a separate main-branch R-key regression: pressedOnce was called twice, consuming
+its edge before the local restart branch. It is now read once per frame. A production
+browser check from the walking cutscene restored the countdown, beach and turtle at
+x=0/z=-24. Confirmed the saved TMNT query still renders in the newer game. All 212 tests
+and both client/server TypeScript plus the production build passed after the fix.
+Additional proof: docs/platform-default-course-fixed.jpg and docs/sculpted-turtle-preserved.jpg.
