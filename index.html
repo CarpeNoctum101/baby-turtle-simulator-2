@@ -29,16 +29,36 @@
         <p>The left stick moves. Up follows the camera, and left or right move sideways. Only the right stick turns the camera, including up and down. Space or B brakes. X uses a Tide Orb ability.</p>
         <p>A second hatchling follows behind you. Sand Spray only catches a racer in the cloud behind your shell. The pale band at the shoreline is the wave zone.</p>
         <button id="startRace" type="button">Start race</button>
+        <p>Start race stays on this computer. An online room shares the countdown, Tide Orbs and finish order. The server decides places.</p>
+        <p>On one computer, set one window to Keyboard only and the other to Controller only.</p>
+        <label class="field">Name <input id="playerName" maxlength="16" value="Hatchling" autocomplete="nickname" /></label>
+        <button id="createRoom" type="button">Create online room</button>
+        <label class="field">Room code <input id="roomCode" maxlength="4" autocapitalize="characters" autocomplete="off" spellcheck="false" /></label>
+        <button id="joinRoom" type="button">Join online room</button>
+        <p id="onlineStatus" role="status"></p>
       </div>
     </section>
     <section id="results" class="overlay" hidden>
       <div class="panel">
-        <h2>You reached the sea</h2>
+        <h2 id="resultsTitle">You reached the sea</h2>
         <p id="resultsPlace">1st of 1</p>
         <p id="resultsTime">Time 0:00.0</p>
+        <ol id="resultsTable" hidden></ol>
         <button id="rematch" type="button">Rematch</button>
       </div>
     </section>
+    <fieldset id="inputChoice">
+      <legend>This window</legend>
+      <label><input type="radio" name="inputDevice" value="both" checked /> Keyboard and controller</label>
+      <label><input type="radio" name="inputDevice" value="keyboard" /> Keyboard only</label>
+      <label><input type="radio" name="inputDevice" value="gamepad" /> Controller only</label>
+    </fieldset>
+    <aside id="lobbyBar" hidden>
+      <p id="lobbySummary">Online room</p>
+      <button id="readyToggle" type="button">Ready</button>
+      <button id="startOnline" type="button" hidden>Start race</button>
+      <button id="leaveRoom" type="button">Leave room</button>
+    </aside>
     <a id="beachPreviewLink" href="?beachPreview=1">Explore the beach preview ↗</a>
     <script type="module" src="/src/main.ts"></script>
   </body>

@@ -13,8 +13,9 @@ npm ci
 npm run dev -- --host 127.0.0.1
 ```
 
-Open http://127.0.0.1:5173/ for the existing course. Open
-http://127.0.0.1:5173/?beachPreview=1 (or select **Explore the beach preview**)
+Open http://127.0.0.1:5173/ for the existing course. For an online race, start
+the local server in another terminal with `npm run server`, then use **Create online room**.
+Open http://127.0.0.1:5173/?beachPreview=1 (or select **Explore the beach preview**)
 for the tropical beach asset study. Both use the same movement and finish logic.
 
 - Select **Start race** or press Enter for a three-second countdown.
@@ -68,7 +69,9 @@ artwork. There are no additional dependencies, downloaded models or paid service
 The merged prototype includes scene/input/movement/finish detection, local race flow,
 Tide Orb pickups and ability implementations. The optional beach study previews
 environment assets without marking the complete visual or performance milestones
-finished. Multiplayer and deployment remain separate work; the rival is local.
+finished. An online room can share the countdown, Tide Orbs, abilities and finish
+order when the local multiplayer server is running. Deployment is still separate.
+The practice rival is local.
 
 ## Automated checks and production preview
 

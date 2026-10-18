@@ -1,6 +1,36 @@
 import type { KeyboardIntent } from "./keyboard";
-import type { GamepadReading } from "./readGamepad";
+import { emptyGamepadReading, type GamepadReading } from "./readGamepad";
 import type { MovementIntent } from "./types";
+
+/** Which devices this browser window is allowed to obey. */
+export type InputChoice = "both" | "keyboard" | "gamepad";
+
+const idleKeyboard: KeyboardIntent = { throttle: 0, steer: 0, brake: false };
+
+export function parseInputChoice(value: string | null): InputChoice {
+  if (value === "keyboard" || value === "gamepad") {
+    return value;
+  }
+  return "both";
+}
+
+/**
+ * Drops the device this window is not using.
+ * Two windows on one computer can then split the keyboard and the controller.
+ */
+export function limitInput(
+  choice: InputChoice,
+  keyboard: KeyboardIntent,
+  gamepad: GamepadReading,
+): { keyboard: KeyboardIntent; gamepad: GamepadReading; listenToMouse: boolean } {
+  if (choice === "keyboard") {
+    return { keyboard, gamepad: emptyGamepadReading, listenToMouse: true };
+  }
+  if (choice === "gamepad") {
+    return { keyboard: idleKeyboard, gamepad, listenToMouse: false };
+  }
+  return { keyboard, gamepad, listenToMouse: true };
+}
 
 /**
  * Keyboard is the default. A connected pad takes over only while its stick

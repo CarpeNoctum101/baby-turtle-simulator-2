@@ -1,16 +1,18 @@
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Scene } from "@babylonjs/core/scene";
-import { createEffects, isTrailVisible, speedModifiers } from "../abilities/abilityState";
-import { abilityCatalog, raceAbilityPool } from "../abilities/catalog";
+import { applySandSlow, createEffects, isTrailVisible, resolveWaveWindow, speedModifiers, stepLoadout, type AbilityLoadout, type RacerEffects } from "../abilities/abilityState";
+import { abilityCatalog, raceAbilityPool, sandRules, shellRules, type AbilityId } from "../abilities/catalog";
+import { orbPickupRadius, tideOrbSpots, type TideOrb } from "../abilities/pickups";
+import { createSandCloud, stepSandClouds } from "../abilities/sandSpray";
 import { createAbilityFx } from "../abilities/renderAbilityFx";
-import { stepAbilityWorld, createAbilityWorld, type AbilityWorld } from "../abilities/stepAbilityWorld";
+import { stepAbilityWorld, createAbilityWorld, type AbilityCue, type AbilityWorld } from "../abilities/stepAbilityWorld";
 import { createAbilityCues } from "../audio/abilityCues";
 import { createFollowCamera, resetFollowCamera, updateFollowCamera } from "../camera/createThirdPersonCamera";
 import { abilityIcon } from "../hud/abilityIcon";
 import { formatAbilityHud, formatAbilityLine, formatPlace } from "../hud/formatAbilityHud";
 import { formatHud } from "../hud/formatHud";
-import { combineMovement } from "../input/combineControls";
+import { combineMovement, limitInput, parseInputChoice, type InputChoice } from "../input/combineControls";
 import { controlSettings, setStickDeadZone } from "../input/controlSettings";
 import { createKeyboardState } from "../input/createKeyboardState";
 import { createMouseLook } from "../input/createMouseLook";
@@ -18,6 +20,20 @@ import { readKeyboard } from "../input/keyboard";
 import { pollGamepads } from "../input/pollGamepads";
 import { lookSource, stepLook, type LookOffsets } from "../input/stepLook";
 import { isInFinishZone, isInWaveZone, surfaceAt } from "../movement/course";
+import { compareResults, syncedRemaining } from "../../shared/raceFlow";
+import { slotPose } from "../../shared/roomState";
+import type { LoadoutMessage, PublicOrb, PublicPlayer, RoomPhase, Ticket } from "../../shared/protocol";
+import { normalizeRoomCode } from "../../shared/protocol";
+import {
+  clearTicket,
+  createOnlineRoom,
+  joinOnlineRoom,
+  loadTicket,
+  OnlineSession,
+  releaseTicket,
+  saveTicket,
+} from "../net/onlineClient";
+import { createRemoteTurtles } from "../net/remoteTurtles";
 import { createTurtleMotion, planFromYaw, stepTurtle, type DriveInput, type TurtleMotion } from "../movement/stepTurtle";
 import { canDrive, countdownLabel, createRaceState, formatRaceTime, startCountdown, stepRace, type RaceState } from "../race/raceState";
 import { createRivalMotion, raceStanding, stepRival } from "../race/stepRival";
@@ -36,8 +52,10 @@ export interface GameUi {
   countdown: HTMLElement;
   raceTimer: HTMLElement;
   results: HTMLElement;
+  resultsTitle: HTMLElement;
   resultsTime: HTMLElement;
   resultsPlace: HTMLElement;
+  resultsTable: HTMLElement;
   rematchButton: HTMLButtonElement;
   abilityHud: HTMLElement;
   abilitySlot: HTMLElement;
@@ -45,6 +63,17 @@ export interface GameUi {
   abilityTimer: HTMLElement;
   abilityTimerLabel: HTMLElement;
   abilityMeterFill: HTMLElement;
+  playerName: HTMLInputElement;
+  createRoomButton: HTMLButtonElement;
+  roomCodeInput: HTMLInputElement;
+  joinRoomButton: HTMLButtonElement;
+  onlineStatus: HTMLElement;
+  lobbyBar: HTMLElement;
+  lobbySummary: HTMLElement;
+  readyToggle: HTMLButtonElement;
+  startOnlineButton: HTMLButtonElement;
+  leaveRoomButton: HTMLButtonElement;
+  inputDevices: HTMLFieldSetElement;
 }
 
 export interface RunningGame {
@@ -54,6 +83,7 @@ export interface RunningGame {
 }
 
 const idleDrive: DriveInput = { throttle: 0, steer: 0, brake: false };
+const inputChoiceKey = "baby-turtle-input";
 
 /**
  * Builds the beach once, then runs a single draw loop.
@@ -93,6 +123,7 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
   const rivalAnimation: TurtleAnimation = { phase: 0 };
   let hudVisible = !beachPreview;
   const heldEdges = new Set<string>();
+  let online = false;
 
   const placeTurtle = (body: PlaceholderTurtle, next: TurtleMotion) => {
     body.root.position.set(next.x, 0, next.z);
@@ -121,14 +152,442 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
   };
   const beginFromMenu = () => {
     cues.unlock();
-    if (race.phase !== "ready" && race.phase !== "finished") {
+    if (online || (race.phase !== "ready" && race.phase !== "finished")) {
       return;
+    }
+    const previous = loadTicket();
+    if (previous) {
+      void releaseTicket(previous);
+      clearTicket();
     }
     restartRace();
   };
 
   ui.startButton.addEventListener("click", beginFromMenu);
-  ui.rematchButton.addEventListener("click", beginFromMenu);
+  const onRematch = () => {
+    if (online) {
+      session?.sendRematch();
+      return;
+    }
+    beginFromMenu();
+  };
+  ui.rematchButton.addEventListener("click", onRematch);
+
+  const remotes = createRemoteTurtles(scene);
+  let session: OnlineSession | null = null;
+  let poseTimer = 0;
+  let selfId = "";
+  let roomCode = "";
+  let onlineHostId = "";
+  let onlinePlayers: PublicPlayer[] = [];
+  let onlinePhase: RoomPhase = "lobby";
+  let clockOffset = 0;
+  let endsAt: number | null = null;
+  let startedAt: number | null = null;
+  let serverOrbs: PublicOrb[] = [];
+  let selfPlace = 0;
+  let selfMs = 0;
+  let mySlot = 0;
+  let finishAttemptAt = 0;
+  let pendingOrb = "";
+  let pendingOrbAt = 0;
+  let raceNotice = "";
+  let home = slotPose(0);
+
+  const renderResults = () => {
+    ui.resultsTitle.textContent = online ? "Race results" : "You reached the sea";
+    ui.resultsTable.hidden = !online;
+    ui.resultsTable.replaceChildren();
+    if (!online) {
+      return;
+    }
+    const rows = onlinePlayers.slice().sort(compareResults);
+    for (const row of rows) {
+      const item = document.createElement("li");
+      item.textContent = row.place > 0
+        ? `${row.place}. ${row.name}  ${formatRaceTime(row.ms / 1000)}`
+        : `— ${row.name}  DNF`;
+      ui.resultsTable.append(item);
+    }
+  };
+
+  const renderLobby = () => {
+    const names = onlinePlayers.map((player) => {
+      const tags = [
+        player.id === selfId ? "you" : "",
+        player.id === onlineHostId ? "host" : "",
+        player.connected ? "" : "away",
+        onlinePhase === "lobby" && player.ready ? "ready" : "",
+        player.place > 0 ? `${player.place}` : "",
+      ].filter((tag) => tag.length > 0);
+      return tags.length > 0 ? `${player.name} (${tags.join(", ")})` : player.name;
+    });
+    const connected = onlinePlayers.filter((player) => player.connected);
+    const me = onlinePlayers.find((player) => player.id === selfId);
+    if (onlinePhase === "countdown") {
+      ui.lobbySummary.textContent = `Room ${roomCode}. The countdown is shared. ${names.join(", ")}.`;
+    } else if (onlinePhase === "racing") {
+      ui.lobbySummary.textContent = `Room ${roomCode}. Racing. The server decides the finish order. ${names.join(", ")}.`;
+    } else if (onlinePhase === "finished") {
+      const rematch = onlineHostId === selfId ? "Rematch returns everyone to the lobby." : "Waiting for the host to rematch.";
+      ui.lobbySummary.textContent = `Room ${roomCode}. Finished. ${rematch}`;
+    } else {
+      ui.lobbySummary.textContent = `Room ${roomCode}. ${connected.length} connected. ${names.join(", ")}. Ready up, then the host starts the countdown.`;
+    }
+    ui.readyToggle.hidden = onlinePhase !== "lobby";
+    ui.readyToggle.textContent = me?.ready ? "Not ready" : "Ready";
+    ui.startOnlineButton.hidden = onlinePhase !== "lobby" || onlineHostId !== selfId;
+    ui.startOnlineButton.disabled = connected.length === 0 || connected.some((player) => !player.ready);
+    ui.rematchButton.disabled = onlineHostId !== selfId;
+    renderResults();
+  };
+
+  const snapHome = () => {
+    const pad = slotPose(mySlot);
+    motion = { x: pad.x, z: pad.z, heading: pad.heading, speed: 0, steer: 0 };
+    placeTurtle(turtle, motion);
+    ending = null;
+    spaceEnding.reset();
+    world = createAbilityWorld();
+    selfPlace = 0;
+    selfMs = 0;
+    finishAttemptAt = 0;
+    pendingOrb = "";
+    race = createRaceState();
+  };
+
+  const syncOnlineClock = (dt: number) => {
+    const local = Date.now();
+    if (onlinePhase === "countdown" && endsAt !== null) {
+      race = {
+        phase: "countdown",
+        countdown: Math.max(0, syncedRemaining(endsAt, clockOffset, local)),
+        elapsed: 0,
+        finishTime: null,
+        goBanner: 0,
+      };
+      return;
+    }
+    if (onlinePhase === "racing" && startedAt !== null) {
+      race = {
+        phase: "racing",
+        countdown: 0,
+        elapsed: Math.max(0, (local + clockOffset - startedAt) / 1000),
+        finishTime: selfPlace > 0 ? selfMs / 1000 : null,
+        goBanner: Math.max(0, race.goBanner - dt),
+      };
+      return;
+    }
+    if (onlinePhase === "finished") {
+      race = {
+        phase: "finished",
+        countdown: 0,
+        elapsed: race.elapsed,
+        finishTime: selfPlace > 0 ? selfMs / 1000 : null,
+        goBanner: 0,
+      };
+      return;
+    }
+    race = createRaceState();
+  };
+
+  const noteSelfFinish = (place: number, ms: number) => {
+    if (place <= selfPlace) {
+      return;
+    }
+    selfPlace = place;
+    selfMs = ms;
+    race = { ...race, finishTime: ms / 1000 };
+    if (!ending && onlinePhase !== "lobby" && onlinePhase !== "countdown") {
+      ending = createEndingState(motion);
+      spaceEnding.begin();
+    }
+  };
+
+  const stopOnline = (status: string, forget: boolean) => {
+    const current = session;
+    session = null;
+    online = false;
+    selfId = "";
+    if (current) {
+      if (forget) {
+        current.leave();
+      } else {
+        current.drop();
+      }
+    }
+    remotes.clear();
+    rivalTurtle.root.setEnabled(true);
+    if (forget) {
+      clearTicket();
+    }
+    spaceEnding.reset();
+    ending = null;
+    motion = createTurtleMotion();
+    rival = createRivalMotion(motion);
+    race = createRaceState();
+    world = createAbilityWorld();
+    placeTurtle(turtle, motion);
+    placeTurtle(rivalTurtle, rival);
+    ui.onlineStatus.textContent = status;
+    ui.lobbyBar.hidden = true;
+    ui.startScreen.hidden = false;
+    ui.rematchButton.disabled = false;
+    ui.resultsTitle.textContent = "You reached the sea";
+    ui.resultsTable.hidden = true;
+    ui.resultsTable.replaceChildren();
+    onlinePhase = "lobby";
+    selfPlace = 0;
+    selfMs = 0;
+    finishAttemptAt = 0;
+    raceNotice = "";
+  };
+
+  const attachOnline = (ticket: Ticket) => {
+    saveTicket(ticket);
+    selfId = ticket.playerId;
+    roomCode = ticket.roomCode;
+    home = slotPose(ticket.slot);
+    remotes.setSelf(ticket.playerId);
+    motion = { x: ticket.x, z: ticket.z, heading: ticket.heading, speed: 0, steer: 0 };
+    placeTurtle(turtle, motion);
+    rivalTurtle.root.setEnabled(false);
+    ui.onlineStatus.textContent = `Joining room ${ticket.roomCode}…`;
+    session?.drop();
+    session = new OnlineSession({
+      onWelcome: (message) => {
+        online = true;
+        poseTimer = 0;
+        selfId = message.playerId;
+        roomCode = message.roomCode;
+        onlineHostId = message.hostId;
+        onlinePhase = message.phase;
+        onlinePlayers = message.players;
+        mySlot = message.slot;
+        home = slotPose(message.slot);
+        motion = { x: message.x, z: message.z, heading: message.heading, speed: 0, steer: 0 };
+        placeTurtle(turtle, motion);
+        remotes.setSelf(message.playerId);
+        remotes.applyRoster(message.players);
+        const me = message.players.find((player) => player.id === message.playerId);
+        if (me) {
+          noteSelfFinish(me.place, me.ms);
+        }
+        ui.startScreen.hidden = true;
+        ui.lobbyBar.hidden = false;
+        ui.onlineStatus.textContent = "";
+        renderLobby();
+        canvas.focus();
+      },
+      onRoster: (message) => {
+        onlineHostId = message.hostId;
+        onlinePhase = message.phase;
+        onlinePlayers = message.players;
+        remotes.applyRoster(message.players);
+        const me = message.players.find((player) => player.id === selfId);
+        if (me) {
+          noteSelfFinish(me.place, me.ms);
+        }
+        renderLobby();
+        if (message.phase === "closed") {
+          stopOnline("This room was closed because everyone left.", true);
+        }
+      },
+      onPhase: (message) => {
+        clockOffset = message.serverNow - Date.now();
+        onlinePhase = message.phase;
+        endsAt = message.endsAt;
+        startedAt = message.startedAt;
+        if (message.snap) {
+          snapHome();
+        }
+        if (message.phase === "racing") {
+          race = {
+            ...race,
+            phase: "racing",
+            countdown: 0,
+            elapsed: 0,
+            finishTime: selfPlace > 0 ? selfMs / 1000 : null,
+            goBanner: selfPlace > 0 ? 0 : 0.8,
+          };
+        } else if (message.phase === "countdown") {
+          race = { ...createRaceState(), phase: "countdown" };
+        } else if (message.phase === "finished") {
+          race = { ...race, phase: "finished", goBanner: 0, finishTime: selfPlace > 0 ? selfMs / 1000 : null };
+        } else if (message.phase === "lobby") {
+          race = createRaceState();
+        }
+        renderLobby();
+      },
+      onOrbs: (message) => {
+        serverOrbs = message.orbs;
+      },
+      onOrb: (message) => {
+        const next = serverOrbs.filter((orb) => orb.id !== message.id);
+        serverOrbs = [...next, { id: message.id, at: message.at }];
+        if (message.playerId === selfId) {
+          world = { ...world, loadout: { ...world.loadout, held: message.ability } };
+          cues.play("pickup");
+          pendingOrb = "";
+        }
+      },
+      onLoadout: (message) => {
+        world = { ...world, loadout: applyServerLoadout(world.loadout, message, Date.now() + clockOffset) };
+      },
+      onAbility: (message) => {
+        const remaining = Math.max(0, (message.until - (Date.now() + clockOffset)) / 1000);
+        const untilLocal = message.until - clockOffset;
+        if (message.playerId === selfId) {
+          world = {
+            ...world,
+            loadout: showServerAbility(world.loadout, message.ability, remaining),
+          };
+          cues.play(cueForAbility(message.ability));
+        } else {
+          remotes.showAbility(message.playerId, message.ability, untilLocal);
+        }
+        if (message.ability === "sand-spray" && remaining > 0) {
+          world = {
+            ...world,
+            clouds: [
+              ...world.clouds,
+              createSandCloud(world.nextCloudId, message.playerId === selfId ? "player" : message.playerId, message, remaining),
+            ],
+            nextCloudId: world.nextCloudId + 1,
+          };
+        }
+        for (const id of message.blocked) {
+          if (id === selfId) {
+            world = {
+              ...world,
+              loadout: {
+                ...world.loadout,
+                effects: { ...world.loadout.effects, shieldCharges: 0, shieldRemaining: 0 },
+              },
+            };
+            blockFlash = 0.28;
+            cues.play("block");
+          } else {
+            remotes.clearShield(id);
+          }
+        }
+        const slowUntil = Date.now() + sandRules.slowDuration * 1000;
+        for (const id of message.slowed) {
+          if (id === selfId) {
+            const slowed = applySandSlow(world.loadout.effects);
+            world = { ...world, loadout: { ...world.loadout, effects: slowed.effects } };
+          } else {
+            remotes.showSlow(id, slowUntil);
+          }
+        }
+      },
+      onFinish: (message) => {
+        if (message.playerId === selfId) {
+          noteSelfFinish(message.place, message.ms);
+        } else {
+          remotes.remove(message.playerId);
+        }
+        renderResults();
+      },
+      onRejectedAction: (message) => {
+        raceNotice = message.reason;
+        if (message.action === "pickup") {
+          pendingOrb = "";
+        }
+      },
+      onPose: (message) => {
+        if (message.playerId === selfId) {
+          motion = { ...motion, x: message.x, z: message.z, heading: message.heading, speed: message.speed };
+          placeTurtle(turtle, motion);
+          return;
+        }
+        remotes.applyPose(message);
+      },
+      onRejected: (message) => {
+        motion = { ...motion, x: message.x, z: message.z, heading: message.heading, speed: message.speed, steer: 0 };
+        placeTurtle(turtle, motion);
+      },
+      onError: (message) => {
+        stopOnline(message, true);
+      },
+      onClose: () => {
+        stopOnline("The room connection closed. Join again with the same code, or start a local race.", false);
+      },
+    });
+    session.connect(ticket);
+  };
+
+  const runOnlineAction = async (action: () => Promise<void>) => {
+    ui.createRoomButton.disabled = true;
+    ui.joinRoomButton.disabled = true;
+    try {
+      await action();
+    } catch (error) {
+      ui.onlineStatus.textContent = error instanceof Error ? error.message : "Could not reach the online lobby.";
+    } finally {
+      ui.createRoomButton.disabled = false;
+      ui.joinRoomButton.disabled = false;
+    }
+  };
+
+  const onCreateRoom = () => {
+    void runOnlineAction(async () => {
+      const previous = loadTicket();
+      if (previous) {
+        await releaseTicket(previous);
+        clearTicket();
+      }
+      attachOnline(await createOnlineRoom(ui.playerName.value));
+    });
+  };
+
+  const onJoinRoom = () => {
+    void runOnlineAction(async () => {
+      const code = normalizeRoomCode(ui.roomCodeInput.value);
+      if (!code) {
+        throw new Error("Enter the 4-character room code.");
+      }
+      const previous = loadTicket();
+      if (previous?.roomCode === code) {
+        attachOnline(previous);
+        return;
+      }
+      if (previous) {
+        await releaseTicket(previous);
+        clearTicket();
+      }
+      attachOnline(await joinOnlineRoom(code, ui.playerName.value));
+    });
+  };
+
+  const onLeaveRoom = () => {
+    stopOnline("", true);
+  };
+
+  ui.createRoomButton.addEventListener("click", onCreateRoom);
+  ui.joinRoomButton.addEventListener("click", onJoinRoom);
+  ui.leaveRoomButton.addEventListener("click", onLeaveRoom);
+  const onReady = () => {
+    const me = onlinePlayers.find((player) => player.id === selfId);
+    session?.sendReady(!me?.ready);
+  };
+  const onStartOnline = () => {
+    session?.sendStart();
+  };
+  ui.readyToggle.addEventListener("click", onReady);
+  ui.startOnlineButton.addEventListener("click", onStartOnline);
+
+  const presetRoom = new URLSearchParams(window.location.search).get("room");
+  if (presetRoom) {
+    ui.roomCodeInput.value = presetRoom;
+  } else {
+    const saved = loadTicket();
+    if (saved) {
+      ui.playerName.value = saved.name;
+      ui.roomCodeInput.value = saved.roomCode;
+      attachOnline(saved);
+    }
+  }
 
   const setHudVisible = (visible: boolean) => {
     hudVisible = visible;
@@ -141,6 +600,18 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
   };
   ui.hudToggle.addEventListener("click", onToggleHud);
   setHudVisible(hudVisible);
+
+  let inputChoice: InputChoice = loadInputChoice();
+  const choiceRadios = [...ui.inputDevices.querySelectorAll<HTMLInputElement>('input[name="inputDevice"]')];
+  for (const radio of choiceRadios) {
+    radio.checked = radio.value === inputChoice;
+  }
+  const onInputChoice = () => {
+    const selected = choiceRadios.find((radio) => radio.checked);
+    inputChoice = parseInputChoice(selected?.value ?? null);
+    sessionStorage.setItem(inputChoiceKey, inputChoice);
+  };
+  ui.inputDevices.addEventListener("change", onInputChoice);
 
   const pressedOnce = (code: string) => {
     if (!keyboard.keys.has(code)) {
@@ -170,27 +641,39 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     if (pressedOnce("KeyH")) {
       setHudVisible(!hudVisible);
     }
-    if (pressedOnce("Enter") && (!ending || sampleEnding(ending).phase === "space")) {
+    if (pressedOnce("Enter") && !online && (!ending || sampleEnding(ending).phase === "space")) {
       beginFromMenu();
     }
-    if (pressedOnce("KeyR") && race.phase !== "ready") {
+    if (pressedOnce("KeyR") && online && onlinePhase === "lobby") {
+      motion = { x: home.x, z: home.z, heading: home.heading, speed: 0, steer: 0 };
+      placeTurtle(turtle, motion);
+      session?.sendReset();
+    } else if (pressedOnce("KeyR") && !online && race.phase !== "ready") {
       restartRace();
     }
 
     const gamepad = pollGamepads(controlSettings.stickDeadZone);
-    const movement = combineMovement(readKeyboard(keyboard.keys), gamepad);
-    const drive = canDrive(race.phase) ? movement : idleDrive;
-    const abilityDown = keyboard.keys.has("KeyX") || gamepad.ability;
+    const limited = limitInput(inputChoice, readKeyboard(keyboard.keys), gamepad);
+    const movement = combineMovement(limited.keyboard, limited.gamepad);
+    const canOnlineDrive = onlinePhase === "lobby" || (onlinePhase === "racing" && selfPlace === 0);
+    const drive = !ending && (online ? canOnlineDrive : canDrive(race.phase)) ? movement : idleDrive;
+    const abilityDown = (inputChoice !== "gamepad" && keyboard.keys.has("KeyX")) || limited.gamepad.ability;
     const activate = abilityDown && !abilityWasDown;
     abilityWasDown = abilityDown;
     if (ending) {
       ending = stepEnding(ending, dt);
       mouse.consume();
     } else {
-      look = stepLook(look, mouse.consume(), { x: gamepad.lookX, y: gamepad.lookY }, dt);
+      const pointer = mouse.consume();
+      look = stepLook(
+        look,
+        limited.listenToMouse ? pointer : { yawDelta: 0, pitchDelta: 0 },
+        { x: limited.gamepad.lookX, y: limited.gamepad.lookY },
+        dt,
+      );
     }
 
-    if (race.phase === "racing") {
+    if (race.phase === "racing" && !online) {
       const ticked = stepAbilityWorld(world, {
         dt,
         racing: true,
@@ -212,17 +695,65 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
       }
     }
 
-    if (race.phase === "racing" || race.phase === "countdown") {
+    if (!online && (race.phase === "racing" || race.phase === "countdown")) {
       motion = stepTurtle(motion, drive, dt, planFromYaw(look.yaw), speedModifiers(world.loadout.effects));
       if (race.phase === "racing") {
         rival = stepRival(rival, motion, dt, speedModifiers(world.rivalEffects));
       }
+    } else if (online && canOnlineDrive && !ending) {
+      motion = stepTurtle(motion, drive, dt, planFromYaw(look.yaw), speedModifiers(world.loadout.effects));
     }
-    const reachedFinish = race.phase === "racing" && isInFinishZone(motion.x, motion.z);
-    race = stepRace(race, dt, reachedFinish);
-    if (reachedFinish) {
-      ending = createEndingState(motion);
-      spaceEnding.begin();
+    if (online && !ending) {
+      const serverNow = Date.now() + clockOffset;
+      const wave = onlinePhase === "racing" && selfPlace === 0
+        ? resolveWaveWindow(world.loadout.effects, isInWaveZone(motion.x, motion.z))
+        : { effects: world.loadout.effects, triggered: false };
+      if (wave.triggered) {
+        cues.play("wave-boost");
+      }
+      world = {
+        ...world,
+        loadout: stepLoadout({ ...world.loadout, effects: wave.effects }, dt),
+        orbs: visualOrbs(serverOrbs, serverNow),
+        clouds: stepSandClouds(world.clouds, dt),
+      };
+      if (onlinePhase === "racing" && selfPlace === 0 && session) {
+        if (activate && world.loadout.held) {
+          session.sendAbility(world.loadout.held);
+        }
+        if (!world.loadout.held) {
+          for (const spot of tideOrbSpots) {
+            const row = serverOrbs.find((orb) => orb.id === spot.id);
+            if ((row?.at ?? 0) > serverNow) {
+              continue;
+            }
+            if (Math.hypot(spot.x - motion.x, spot.z - motion.z) > orbPickupRadius) {
+              continue;
+            }
+            if (pendingOrb === spot.id && serverNow - pendingOrbAt < 500) {
+              break;
+            }
+            pendingOrb = spot.id;
+            pendingOrbAt = serverNow;
+            session.sendPickup(spot.id);
+            break;
+          }
+        }
+        if (isInFinishZone(motion.x, motion.z) && serverNow - finishAttemptAt > 250) {
+          finishAttemptAt = serverNow;
+          session.sendFinish();
+        }
+      }
+    }
+    if (!online) {
+      const reachedFinish = race.phase === "racing" && isInFinishZone(motion.x, motion.z);
+      race = stepRace(race, dt, reachedFinish);
+      if (reachedFinish) {
+        ending = createEndingState(motion);
+        spaceEnding.begin();
+      }
+    } else {
+      syncOnlineClock(dt);
     }
 
     const endingFrame = ending ? sampleEnding(ending) : null;
@@ -233,7 +764,17 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
       updateFollowCamera(camera, look, motion.x, motion.z);
     }
     placeTurtle(rivalTurtle, rival);
-    const playerSpeed = endingFrame?.speed ?? (canDrive(race.phase) ? motion.speed : 0);
+    if (online) {
+      if (session && canOnlineDrive) {
+        poseTimer += dt;
+        if (poseTimer >= 0.05) {
+          poseTimer = 0;
+          session.sendPose({ x: motion.x, z: motion.z, heading: motion.heading, speed: motion.speed });
+        }
+      }
+      remotes.step(dt);
+    }
+    const playerSpeed = endingFrame?.speed ?? (online || canDrive(race.phase) ? motion.speed : 0);
     stepTurtleAnimation(animation, turtle.visual, turtle.flippers, playerSpeed, dt,
       !endingFrame && world.loadout.effects.frenzyRemaining > 0);
     if (endingFrame?.phase === "boarding") {
@@ -244,12 +785,13 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
       }
     }
     stepTurtleAnimation(rivalAnimation, rivalTurtle.visual, rivalTurtle.flippers, canDrive(race.phase) ? rival.speed : 0, dt, false);
+    const showOnlineFx = online && !endingFrame && (onlinePhase === "countdown" || onlinePhase === "racing");
     fx.sync({
       time: clock,
-      orbs: world.orbs,
+      orbs: endingFrame ? [] : online ? (showOnlineFx ? world.orbs : []) : world.orbs,
       clouds: endingFrame ? [] : world.clouds,
       playerEffects: endingFrame ? inactiveEffects : world.loadout.effects,
-      rivalEffects: endingFrame ? inactiveEffects : world.rivalEffects,
+      rivalEffects: endingFrame || online ? inactiveEffects : world.rivalEffects,
       blockFlash: endingFrame ? 0 : blockFlash,
       playerX: motion.x,
       playerZ: motion.z,
@@ -262,14 +804,18 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
       rivalShell: rivalTurtle.shell,
     });
 
-    const standing = raceStanding(motion.z, rival.z);
+    const standing = online
+      ? selfPlace > 0
+        ? { place: selfPlace, field: Math.max(1, onlinePlayers.length) }
+        : liveStanding(onlinePlayers, selfId, motion.z)
+      : raceStanding(motion.z, rival.z);
     const abilityView = formatAbilityHud({
       held: world.loadout.held,
       effects: world.loadout.effects,
     });
     syncAbilityHud(ui, abilityView);
-    syncRaceUi(ui, race, hudVisible, standing, endingFrame?.phase ?? null);
-    ui.hud.textContent = formatHud({
+    syncRaceUi(ui, race, hudVisible, standing, endingFrame?.phase ?? null, online);
+    const readout = formatHud({
       phase: race.phase,
       elapsed: race.elapsed,
       finishTime: race.finishTime,
@@ -278,7 +824,7 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
       x: motion.x,
       z: motion.z,
       movementSource: movement.source,
-      lookSource: lookSource(gamepad.lookX, gamepad.lookY),
+      lookSource: lookSource(limited.gamepad.lookX, limited.gamepad.lookY),
       pointerLocked: mouse.pointerLocked,
       deadZone: controlSettings.stickDeadZone,
       gamepad,
@@ -286,6 +832,15 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
       field: standing.field,
       abilityLine: formatAbilityLine(abilityView),
     });
+    const choiceNote = inputChoice === "keyboard"
+      ? "This window listens to the keyboard only.\n"
+      : inputChoice === "gamepad"
+        ? "This window listens to the controller only.\n"
+        : "";
+    const onlineNote = online
+      ? `Online room ${roomCode}. The server keeps the countdown, Tide Orbs and finish order.${raceNotice ? ` ${raceNotice}` : ""}\n`
+      : "";
+    ui.hud.textContent = `${onlineNote}${choiceNote}${readout}`;
     scene.render();
   });
 
@@ -301,7 +856,15 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
       window.removeEventListener("resize", onResize);
       ui.hudToggle.removeEventListener("click", onToggleHud);
       ui.startButton.removeEventListener("click", beginFromMenu);
-      ui.rematchButton.removeEventListener("click", beginFromMenu);
+      ui.rematchButton.removeEventListener("click", onRematch);
+      ui.createRoomButton.removeEventListener("click", onCreateRoom);
+      ui.joinRoomButton.removeEventListener("click", onJoinRoom);
+      ui.leaveRoomButton.removeEventListener("click", onLeaveRoom);
+      ui.readyToggle.removeEventListener("click", onReady);
+      ui.startOnlineButton.removeEventListener("click", onStartOnline);
+      ui.inputDevices.removeEventListener("change", onInputChoice);
+      session?.drop();
+      remotes.clear();
       keyboard.dispose();
       mouse.dispose();
       cues.dispose();
@@ -311,6 +874,16 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
       engine.dispose();
     },
   };
+}
+
+function loadInputChoice(): InputChoice {
+  const params = new URLSearchParams(window.location.search);
+  if (params.has("input")) {
+    const choice = parseInputChoice(params.get("input"));
+    sessionStorage.setItem(inputChoiceKey, choice);
+    return choice;
+  }
+  return parseInputChoice(sessionStorage.getItem(inputChoiceKey));
 }
 
 function syncAbilityHud(ui: GameUi, view: ReturnType<typeof formatAbilityHud>): void {
@@ -337,13 +910,15 @@ function syncRaceUi(
   hudVisible: boolean,
   standing: { place: number; field: number },
   endingPhase: EndingPhase | null,
+  onlineMode: boolean,
 ): void {
   const cinematic = endingPhase !== null && endingPhase !== "space";
-  const menuOpen = race.phase === "ready" || (race.phase === "finished" && !cinematic);
+  const menuOpen = !onlineMode && (race.phase === "ready" || (race.phase === "finished" && !cinematic));
   ui.hud.hidden = menuOpen || cinematic || !hudVisible;
   ui.hudToggle.hidden = menuOpen || cinematic;
-  ui.abilityHud.hidden = menuOpen || cinematic;
-  ui.startScreen.hidden = race.phase !== "ready";
+  ui.abilityHud.hidden = menuOpen || cinematic || (onlineMode && race.phase !== "racing");
+  ui.startScreen.hidden = onlineMode || race.phase !== "ready";
+  ui.lobbyBar.hidden = !onlineMode;
   ui.results.hidden = race.phase !== "finished" || cinematic;
   const label = countdownLabel(race);
   ui.countdown.hidden = label === null;
@@ -357,5 +932,68 @@ function syncRaceUi(
   if (race.phase === "finished" && race.finishTime !== null) {
     ui.resultsPlace.textContent = formatPlace(standing.place, standing.field);
     ui.resultsTime.textContent = `Time ${formatRaceTime(race.finishTime)}`;
+  } else if (race.phase === "finished" && onlineMode) {
+    ui.resultsPlace.textContent = "Did not finish";
+    ui.resultsTime.textContent = "The server closed the race.";
   }
+}
+
+function liveStanding(players: readonly PublicPlayer[], selfId: string, z: number): { place: number; field: number } {
+  const field = Math.max(1, players.length);
+  const ahead = players.filter((player) => player.id !== selfId && player.z > z).length;
+  return { place: ahead + 1, field };
+}
+
+function visualOrbs(orbs: readonly PublicOrb[], now: number): TideOrb[] {
+  return tideOrbSpots.map((spot) => {
+    const row = orbs.find((orb) => orb.id === spot.id);
+    const at = row?.at ?? 0;
+    return {
+      id: spot.id,
+      x: spot.x,
+      z: spot.z,
+      respawnIn: at > now ? (at - now) / 1000 : 0,
+    };
+  });
+}
+
+function applyServerLoadout(loadout: AbilityLoadout, message: LoadoutMessage, serverNow: number): AbilityLoadout {
+  const remaining = Math.max(0, (message.until - serverNow) / 1000);
+  const effects: RacerEffects = { ...loadout.effects };
+  effects.frenzyRemaining = message.active === "flipper-frenzy" ? remaining : 0;
+  effects.shieldRemaining = message.active === "shell-guard" ? remaining : 0;
+  effects.shieldCharges = message.active === "shell-guard" && remaining > 0 ? shellRules.charges : 0;
+  effects.sprayRemaining = message.active === "sand-spray" ? remaining : 0;
+  effects.waveWindowRemaining = message.active === "wave-rider" ? remaining : 0;
+  effects.trailRemaining = message.active === "magnetic-sense" ? remaining : 0;
+  effects.slowRemaining = message.slowUntil > serverNow ? (message.slowUntil - serverNow) / 1000 : 0;
+  return { held: message.held, effects };
+}
+
+function showServerAbility(loadout: AbilityLoadout, ability: AbilityId, remaining: number): AbilityLoadout {
+  const seconds = Math.max(0, remaining);
+  const effects: RacerEffects = { ...loadout.effects };
+  effects.frenzyRemaining = ability === "flipper-frenzy" ? seconds : 0;
+  effects.shieldRemaining = ability === "shell-guard" ? seconds : 0;
+  effects.shieldCharges = ability === "shell-guard" && seconds > 0 ? shellRules.charges : 0;
+  effects.sprayRemaining = ability === "sand-spray" ? seconds : 0;
+  effects.waveWindowRemaining = ability === "wave-rider" ? seconds : 0;
+  effects.trailRemaining = ability === "magnetic-sense" ? seconds : 0;
+  return { held: null, effects };
+}
+
+function cueForAbility(ability: AbilityId): AbilityCue {
+  if (ability === "flipper-frenzy") {
+    return "frenzy";
+  }
+  if (ability === "shell-guard") {
+    return "shield";
+  }
+  if (ability === "sand-spray") {
+    return "spray";
+  }
+  if (ability === "wave-rider") {
+    return "wave-arm";
+  }
+  return "trail";
 }
