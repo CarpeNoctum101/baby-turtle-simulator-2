@@ -50,13 +50,26 @@
     </section>
     <section id="results" class="overlay" hidden>
       <div class="panel">
-        <h2>You reached the sea</h2>
+        <h2 id="resultsTitle">You reached the sea</h2>
         <p id="resultsPlace">1st of 1</p>
         <p id="resultsTime">Time 0:00.0</p>
+        <ol id="resultsTable" hidden></ol>
         <div class="typePicker" role="radiogroup" aria-label="Turtle type"></div>
         <button id="rematch" type="button">Rematch</button>
       </div>
     </section>
+    <fieldset id="inputChoice">
+      <legend>This window</legend>
+      <label><input type="radio" name="inputDevice" value="both" checked /> Keyboard and controller</label>
+      <label><input type="radio" name="inputDevice" value="keyboard" /> Keyboard only</label>
+      <label><input type="radio" name="inputDevice" value="gamepad" /> Controller only</label>
+    </fieldset>
+    <aside id="lobbyBar" hidden>
+      <p id="lobbySummary">Online room</p>
+      <button id="readyToggle" type="button">Ready</button>
+      <button id="startOnline" type="button" hidden>Start race</button>
+      <button id="leaveRoom" type="button">Leave room</button>
+    </aside>
     <a id="beachPreviewLink" href="?beachPreview=1">Explore the beach preview ↗</a>
     <script type="module" src="/src/main.ts"></script>
   </body>

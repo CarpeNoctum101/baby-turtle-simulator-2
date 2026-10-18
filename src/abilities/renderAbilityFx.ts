@@ -40,7 +40,7 @@ const black = new Color3(0, 0, 0);
 /** Orbs, debris, the shell bubble, the sand puff, the wave band, and the trail. Meshes are created once. */
 export function createAbilityFx(scene: Scene, playerVisual: TransformNode): AbilityFx {
   const orbs = tideOrbSpots.map((spot, index) => createOrb(scene, spot.id, spot.x, spot.z, index));
-  const clouds = [0, 1, 2].map((index) => createCloud(scene, index));
+  const clouds = Array.from({ length: 8 }, (_, index) => createCloud(scene, index));
   const shield = createShield(scene, playerVisual);
   const wave = createWaveBand(scene);
   const trail = createTrail(scene);

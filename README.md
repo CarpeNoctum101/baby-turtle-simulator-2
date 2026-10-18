@@ -119,7 +119,9 @@ https://sketchfab.com/3d-models/seagull-dd79fddb754f47caa3145e7d184e3e58
 The merged prototype includes scene/input/movement/finish detection, local race flow,
 Tide Orb pickups and ability implementations. The optional beach study previews
 environment assets without marking the complete visual or performance milestones
-finished. Multiplayer and deployment remain separate work; the rival is local.
+finished. An online room can share the countdown, Tide Orbs, abilities and finish
+order when the local multiplayer server is running. Deployment is still separate.
+The practice rival is local.
 
 ## Automated checks and production preview
 
