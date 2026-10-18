@@ -13,7 +13,8 @@ export const seagullRules = {
   /** Past this distance from its home the gull gives up and flies back. */
   leashRadius: 18,
   hitRange: 1.1,
-  damage: 14,
+  /** A landed hit costs this share of the turtle's maximum health, so it scales with the turtle type. */
+  damageFraction: 0.33,
   /** Starting push speeds in metres per second. Each fades out by `knockDecay`. */
   playerKnockSpeed: 8,
   gullKnockSpeed: 7,
@@ -380,4 +381,29 @@ function circleHome(gull: Seagull, dt: number): Seagull {
     z: gull.home.z + Math.sin(angle) * seagullRules.circleRadius,
   };
   return flyToward(gull, spot, seagullRules.returnSpeed, dt, seagullRules.cruiseHeight);
+}
+
+/**
+ * What the ground should show about a flying gull, so the player can see a dive coming.
+ * `ring` runs from 0 (nothing) to 1 (strongest): a faint circle under the gull as wide as its dive range.
+ * `marker` is where a dive in progress will land.
+ */
+export function diveWarning(gull: Seagull): { ring: number; marker: Vec2 | null } {
+  if (!gull.flier) {
+    return { ring: 0, marker: null };
+  }
+  switch (gull.phase) {
+    case "perched":
+      return { ring: 0.35, marker: null };
+    case "chase":
+      return { ring: 0.7, marker: null };
+    case "dive":
+      return { ring: 1, marker: gull.diveTo };
+    case "climb":
+    case "recover":
+    case "return":
+      return { ring: 0.4, marker: null };
+    default:
+      return { ring: 0, marker: null };
+  }
 }

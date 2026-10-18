@@ -4,6 +4,7 @@ import { Scene } from "@babylonjs/core/scene";
 import { createEffects, isTrailVisible, speedModifiers } from "../abilities/abilityState";
 import { exhaustionScale } from "../abilities/health";
 import { lungeExtension } from "../abilities/snap";
+import { spinRules } from "../abilities/specials";
 import { abilityCatalog, raceAbilityPool } from "../abilities/catalog";
 import { createAbilityFx } from "../abilities/renderAbilityFx";
 import { stepAbilityWorld, createAbilityWorld, type AbilityWorld } from "../abilities/stepAbilityWorld";
@@ -13,7 +14,7 @@ import { seagullSpawns } from "../mob/seagull";
 import { createFollowCamera, resetFollowCamera, updateFollowCamera } from "../camera/createThirdPersonCamera";
 import { abilityIcon } from "../hud/abilityIcon";
 import { formatAbilityHud, formatAbilityLine, formatPlace } from "../hud/formatAbilityHud";
-import { formatHealth, formatSnap } from "../hud/formatHealthHud";
+import { formatHealth, formatSpecial } from "../hud/formatHealthHud";
 import { formatHud } from "../hud/formatHud";
 import { combineMovement } from "../input/combineControls";
 import { controlSettings, setStickDeadZone } from "../input/controlSettings";
@@ -109,7 +110,9 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
   let rescuing = false;
   let playerLift = 0;
   let abilityWasDown = false;
-  let snapWasDown = false;
+  let specialWasDown = false;
+  let controlsLocked = false;
+  let spinAngle = 0;
   let hurtFlash = 0;
   let lastHealth = world.playerHealth.current;
   let blockFlash = 0;
@@ -170,6 +173,8 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     race = startCountdown(race);
     world = createAbilityWorld(turtleType.maxHealth, seagullSpawns);
     rescuing = false;
+    controlsLocked = false;
+    spinAngle = 0;
     playerLift = 0;
     lastHealth = world.playerHealth.current;
     hurtFlash = 0;
@@ -243,13 +248,13 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
 
     const gamepad = pollGamepads(controlSettings.stickDeadZone);
     const movement = combineMovement(readKeyboard(keyboard.keys), gamepad);
-    const drive = canDrive(race.phase) && !rescuing ? movement : idleDrive;
+    const drive = canDrive(race.phase) && !controlsLocked ? movement : idleDrive;
     const abilityDown = keyboard.keys.has("KeyX") || gamepad.ability;
     const activate = abilityDown && !abilityWasDown;
     abilityWasDown = abilityDown;
-    const snapDown = keyboard.keys.has("KeyE") || gamepad.snap;
-    const snapPressed = snapDown && !snapWasDown;
-    snapWasDown = snapDown;
+    const specialDown = keyboard.keys.has("KeyE") || gamepad.snap;
+    const specialPressed = specialDown && !specialWasDown;
+    specialWasDown = specialDown;
     if (ending) {
       ending = stepEnding(ending, dt);
       mouse.consume();
@@ -269,11 +274,12 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
         random: Math.random,
         pool: raceAbilityPool,
         itemSlots: turtleType.itemSlots,
-        canSnap: turtleType.canSnap,
-        snapPressed,
+        special: turtleType.special,
+        specialPressed,
       });
       world = ticked.world;
       rescuing = ticked.rescuing;
+      controlsLocked = ticked.controlsLocked;
       shift = ticked.playerShift;
       playerLift = ticked.playerLift;
       motion = ticked.player;
@@ -318,6 +324,10 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     }
     placeTurtle(rivalTurtle, rival);
     const playerSpeed = endingFrame?.speed ?? (rescuing ? 4 : canDrive(race.phase) ? motion.speed : 0);
+    // Kempy's shell whirls while the spin dash is on, then snaps back to facing forward.
+    const spinning = !endingFrame && world.loadout.effects.spinRemaining > 0;
+    spinAngle = spinning ? spinAngle + spinRules.turnsPerSecond * Math.PI * 2 * dt : 0;
+    turtle.visual.rotation.y = spinAngle;
     turtle.setHeadReach(turtleType.neckLength + (endingFrame ? 0 : lungeExtension(world.snap)));
     stepTurtleAnimation(animation, turtle.visual, turtle.flippers, playerSpeed, dt,
       !endingFrame && world.loadout.effects.frenzyRemaining > 0);
@@ -466,10 +476,16 @@ function syncHealthHud(ui: GameUi, world: AbilityWorld, type: (typeof turtleType
   ui.abilitySpare.setAttribute("aria-label", spare ? `Next: ${abilityCatalog[spare].name}` : "Second slot empty");
   ui.abilitySpareIcon.innerHTML = spare ? abilityIcon(spare) : "";
 
-  ui.snapHud.hidden = !type.canSnap;
-  if (type.canSnap) {
-    const snap = formatSnap(world.snap);
-    ui.snapLabel.textContent = snap.label;
-    ui.snapFill.style.width = `${snap.meter * 100}%`;
+  ui.snapHud.hidden = type.special === null;
+  if (type.special) {
+    const special = formatSpecial({
+      kind: type.special,
+      snap: world.snap,
+      slam: world.slam,
+      spin: world.spin,
+      effects: world.loadout.effects,
+    });
+    ui.snapLabel.textContent = special.label;
+    ui.snapFill.style.width = `${special.meter * 100}%`;
   }
 }

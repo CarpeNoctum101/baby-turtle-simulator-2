@@ -6,7 +6,7 @@ import { debrisLayout } from "./contacts";
 import { damageRules } from "./health";
 import { collectTideOrbs, createTideOrbs, tideOrbSpots } from "./pickups";
 import { raceAbilityPool, starterAbilityPool } from "./catalog";
-import { createAbilityWorld, stepAbilityWorld, type AbilityTick } from "./stepAbilityWorld";
+import { createAbilityWorld, defaultMaxHealth, stepAbilityWorld, type AbilityTick } from "./stepAbilityWorld";
 
 const spot = tideOrbSpots[0]!;
 const onOrb = { x: spot.x, z: spot.z };
@@ -71,7 +71,7 @@ describe("health in the world", () => {
     const debris = debrisLayout[0];
     const player = { ...createTurtleMotion(), x: debris.x, z: debris.z };
     const hit = tick(createAbilityWorld(), { player, rival: { ...createTurtleMotion(), x: 20, z: 20 } });
-    expect(hit.world.playerHealth.current).toBe(100 - damageRules.debris);
+    expect(hit.world.playerHealth.current).toBe(defaultMaxHealth - damageRules.debris);
   });
 
   it("costs nothing when Shell Guard stops the hit", () => {
@@ -80,18 +80,18 @@ describe("health in the world", () => {
     const guarded = { ...world, loadout: beginAbility(holdAbility(world.loadout, "shell-guard"), "shell-guard").loadout };
     const player = { ...createTurtleMotion(), x: debris.x, z: debris.z };
     const hit = tick(guarded, { player, rival: { ...createTurtleMotion(), x: 20, z: 20 } });
-    expect(hit.world.playerHealth.current).toBe(100);
+    expect(hit.world.playerHealth.current).toBe(defaultMaxHealth);
   });
 
   it("lets only a snap-capable turtle snap, and damages the rival", () => {
     const player = createTurtleMotion();
-    const plain = tick(createAbilityWorld(), { player, snapPressed: true, canSnap: false });
-    expect(plain.world.rivalHealth.current).toBe(100);
-    const snapped = tick(createAbilityWorld(115), { player, snapPressed: true, canSnap: true });
-    expect(snapped.world.rivalHealth.current).toBe(100 - damageRules.snap);
+    const plain = tick(createAbilityWorld(), { player, specialPressed: true, special: null });
+    expect(plain.world.rivalHealth.current).toBe(defaultMaxHealth);
+    const snapped = tick(createAbilityWorld(115), { player, specialPressed: true, special: "snap" });
+    expect(snapped.world.rivalHealth.current).toBe(defaultMaxHealth - damageRules.snap);
     expect(snapped.cues).toContain("snap-hit");
-    const again = tick(snapped.world, { player, snapPressed: true, canSnap: true });
-    expect(again.world.rivalHealth.current).toBe(100 - damageRules.snap);
+    const again = tick(snapped.world, { player, specialPressed: true, special: "snap" });
+    expect(again.world.rivalHealth.current).toBe(defaultMaxHealth - damageRules.snap);
   });
 
   it("collects no orb for a no-slot turtle", () => {

@@ -1,11 +1,12 @@
 import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { LoadAssetContainerAsync } from "@babylonjs/core/Loading/sceneLoader";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
 import "@babylonjs/loaders/glTF";
-import type { Seagull } from "./seagull";
+import { diveWarning, seagullRules, type Seagull } from "./seagull";
 
 /**
  * "Seagull" by Bwinji Shamutete (Sketchfab, MangyMedusa), CC BY 4.0.
@@ -56,12 +57,29 @@ export function createSeagullMobs(scene: Scene, seagulls: readonly Seagull[]): S
       });
     });
 
+  // Fliers get a faint circle on the sand under them (their dive range) and a marker where a dive will land.
+  const warnings = seagulls.map((gull) => (gull.flier ? createWarning(scene, gull.id) : null));
+
   return {
     sync(current, time) {
       rigs.forEach((rig, index) => {
         const gull = current[index];
         if (!gull) {
           return;
+        }
+        const warning = warnings[index];
+        if (warning) {
+          const { ring, marker } = diveWarning(gull);
+          warning.ring.isVisible = ring > 0;
+          if (ring > 0) {
+            warning.ring.position.set(gull.x, 0.06, gull.z);
+            warning.ringMaterial.alpha = 0.1 + 0.22 * ring + Math.sin(time * 4) * 0.03;
+          }
+          warning.marker.isVisible = marker !== null;
+          if (marker) {
+            warning.marker.position.set(marker.x, 0.07, marker.z);
+            warning.markerMaterial.alpha = 0.18 + Math.sin(time * 14) * 0.08;
+          }
         }
         const stunned = gull.phase === "stunned";
         const flapping = gull.y > 0.8 && !stunned;
@@ -83,4 +101,36 @@ function buildStandIn(scene: Scene, parent: TransformNode, id: string): void {
   const wings = MeshBuilder.CreateBox(`${id}StandInWings`, { width: 1.9, height: 0.04, depth: 0.5 }, scene);
   wings.material = white;
   wings.parent = parent;
+}
+
+function createWarning(
+  scene: Scene,
+  id: string,
+): { ring: Mesh; ringMaterial: StandardMaterial; marker: Mesh; markerMaterial: StandardMaterial } {
+  const make = (name: string, color: Color3) => {
+    const material = new StandardMaterial(name, scene);
+    material.disableLighting = true;
+    material.emissiveColor = color;
+    material.alpha = 0.1;
+    material.backFaceCulling = false;
+    return material;
+  };
+  const ringMaterial = make(`${id}RingMaterial`, new Color3(0.95, 0.5, 0.2));
+  const ring = MeshBuilder.CreateTorus(
+    `${id}DiveRing`,
+    { diameter: seagullRules.diveRange * 2, thickness: 0.1, tessellation: 56 },
+    scene,
+  );
+  ring.scaling.y = 0.02;
+  ring.material = ringMaterial;
+  ring.isPickable = false;
+  ring.isVisible = false;
+
+  const markerMaterial = make(`${id}MarkerMaterial`, new Color3(1, 0.6, 0.4));
+  const marker = MeshBuilder.CreateDisc(`${id}DiveMarker`, { radius: seagullRules.hitRange, tessellation: 28 }, scene);
+  marker.rotation.x = Math.PI / 2;
+  marker.material = markerMaterial;
+  marker.isPickable = false;
+  marker.isVisible = false;
+  return { ring, ringMaterial, marker, markerMaterial };
 }

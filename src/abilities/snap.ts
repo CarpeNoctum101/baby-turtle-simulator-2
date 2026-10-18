@@ -5,7 +5,7 @@ import { damageRules } from "./health";
 import type { TurtleMotion } from "../movement/stepTurtle";
 
 export const snapRules = {
-  cooldown: 4,
+  cooldown: 8,
   /** The neck swivels, so the snap reaches a rival in any direction within this distance. */
   reach: 2.6,
   /** A gull higher than this is out of the neck's reach. */
