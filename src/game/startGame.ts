@@ -24,6 +24,7 @@ import { readKeyboard } from "../input/keyboard";
 import { pollGamepads } from "../input/pollGamepads";
 import { lookSource, stepLook, type LookOffsets } from "../input/stepLook";
 import { clampToBeach, clampToCourse, isInFinishZone, isInWaveZone, surfaceAt } from "../movement/course";
+import { pushOutOfObstacles } from "../movement/obstacles";
 import { createTurtleMotion, planFromYaw, stepTurtle, type DriveInput, type TurtleMotion } from "../movement/stepTurtle";
 import { canDrive, countdownLabel, createRaceState, formatRaceTime, startCountdown, stepRace, type RaceState } from "../race/raceState";
 import { createRivalMotion, raceStanding, stepRival } from "../race/stepRival";
@@ -62,6 +63,7 @@ export interface GameUi {
   snapHud: HTMLElement;
   snapLabel: HTMLElement;
   snapFill: HTMLElement;
+  crosshair: HTMLElement;
   /** Containers that get one button per turtle type. */
   typePickers: HTMLElement[];
 }
@@ -111,6 +113,7 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
   let playerLift = 0;
   let abilityWasDown = false;
   let specialWasDown = false;
+  let shootWasDown = false;
   let controlsLocked = false;
   let spinAngle = 0;
   let hurtFlash = 0;
@@ -255,6 +258,9 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     const specialDown = keyboard.keys.has("KeyE") || gamepad.snap;
     const specialPressed = specialDown && !specialWasDown;
     specialWasDown = specialDown;
+    const shootDown = keyboard.keys.has("KeyF") || mouse.shooting || gamepad.shoot;
+    const shootPressed = shootDown && !shootWasDown;
+    shootWasDown = shootDown;
     if (ending) {
       ending = stepEnding(ending, dt);
       mouse.consume();
@@ -262,6 +268,7 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
       look = stepLook(look, mouse.consume(), { x: gamepad.lookX, y: gamepad.lookY }, dt);
     }
 
+    const aim = planFromYaw(look.yaw);
     let shift = { x: 0, z: 0 };
     if (race.phase === "racing") {
       const ticked = stepAbilityWorld(world, {
@@ -276,6 +283,9 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
         itemSlots: turtleType.itemSlots,
         special: turtleType.special,
         specialPressed,
+        shoot: !controlsLocked && shootPressed,
+        aimX: aim.forwardX,
+        aimZ: aim.forwardZ,
       });
       world = ticked.world;
       rescuing = ticked.rescuing;
@@ -307,6 +317,14 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
       if (race.phase === "racing") {
         rival = stepRival(rival, motion, dt, scaleCrawl(speedModifiers(world.rivalEffects), exhaustionScale(world.rivalHealth)));
       }
+    }
+    if (!ending && playerLift <= 0) {
+      const pushed = pushOutOfObstacles(motion.x, motion.z);
+      motion = { ...motion, x: clampToBeach(pushed.x), z: clampToCourse(pushed.z) };
+    }
+    if (!ending) {
+      const pushed = pushOutOfObstacles(rival.x, rival.z);
+      rival = { ...rival, x: clampToBeach(pushed.x), z: clampToCourse(pushed.z) };
     }
     const reachedFinish = race.phase === "racing" && isInFinishZone(motion.x, motion.z);
     race = stepRace(race, dt, reachedFinish);
@@ -356,6 +374,8 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
       playerShell: turtle.shell,
       rivalSkin: rivalTurtle.skin,
       rivalShell: rivalTurtle.shell,
+      bubbles: endingFrame ? [] : world.bubbles,
+      traps: endingFrame ? [] : trapMarkers(world, rival.x, rival.z),
     });
 
     const standing = raceStanding(motion.z, rival.z);
@@ -367,6 +387,9 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     syncAbilityHud(ui, abilityView);
     syncHealthHud(ui, world, turtleType, hurtFlash > 0);
     syncRaceUi(ui, race, hudVisible, standing, endingFrame?.phase ?? null);
+    const aiming = race.phase === "racing" && endingFrame === null;
+    ui.crosshair.hidden = !aiming;
+    ui.crosshair.dataset.ready = String(world.bubbleCooldown <= 0);
     ui.hud.textContent = formatHud({
       phase: race.phase,
       elapsed: race.elapsed,
@@ -410,6 +433,19 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
       engine.dispose();
     },
   };
+}
+
+function trapMarkers(world: AbilityWorld, rivalX: number, rivalZ: number): { x: number; y: number; z: number }[] {
+  const traps: { x: number; y: number; z: number }[] = [];
+  if (world.rivalEffects.bubbleRemaining > 0) {
+    traps.push({ x: rivalX, y: 0.55, z: rivalZ });
+  }
+  for (const gull of world.seagulls) {
+    if (gull.bubble > 0) {
+      traps.push({ x: gull.x, y: Math.max(0.7, gull.y), z: gull.z });
+    }
+  }
+  return traps;
 }
 
 function syncAbilityHud(ui: GameUi, view: ReturnType<typeof formatAbilityHud>): void {

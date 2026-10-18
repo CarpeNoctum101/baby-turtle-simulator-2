@@ -30,6 +30,7 @@ const abilitySpareIcon = byId("abilitySpareIcon");
 const snapHud = byId("snapHud");
 const snapLabel = byId("snapLabel");
 const snapFill = byId("snapFill");
+const crosshair = byId("crosshair");
 const typePickers = Array.from(document.querySelectorAll<HTMLElement>(".typePicker"));
 
 const ui: GameUi | null =
@@ -59,7 +60,8 @@ const ui: GameUi | null =
   abilitySpareIcon &&
   snapHud &&
   snapLabel &&
-  snapFill
+  snapFill &&
+  crosshair
     ? {
         hud,
         hudToggle,
@@ -87,6 +89,7 @@ const ui: GameUi | null =
         snapHud,
         snapLabel,
         snapFill,
+        crosshair,
         typePickers,
       }
     : null;

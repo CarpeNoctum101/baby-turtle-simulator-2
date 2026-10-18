@@ -79,6 +79,8 @@ export interface Seagull {
   carryTo: Vec2;
   /** True for gulls that circle high up and dive at the turtle instead of walking in low. */
   flier: boolean;
+  /** Seconds left inside a bubble. The gull stays put and cannot strike until this reaches zero. */
+  bubble: number;
   /** Where a dive is headed, and where it began. */
   diveTo: Vec2;
   diveFrom: { x: number; y: number; z: number };
@@ -101,6 +103,7 @@ export function createSeagull(id: string, home: Vec2, flier = false): Seagull {
     grace: 0,
     carryFrom: { x: home.x, z: home.z },
     carryTo: { x: home.x, z: home.z },
+    bubble: 0,
   };
 }
 
@@ -162,6 +165,14 @@ export function strikeSeagull(gull: Seagull, player: Vec2): Seagull {
   };
 }
 
+/** A bubble closes around the gull. A rescue already in progress is left alone. */
+export function trapSeagull(gull: Seagull, seconds: number): Seagull {
+  if (isRescuePhase(gull.phase)) {
+    return gull;
+  }
+  return { ...gull, bubble: Math.max(gull.bubble, seconds), knock: { x: 0, z: 0 } };
+}
+
 /** A snap lands: the gull drops to the sand, gets pushed back a little, and cannot attack until it recovers. */
 export function stunSeagull(gull: Seagull, from: Vec2): Seagull {
   if (isRescuePhase(gull.phase)) {
@@ -192,6 +203,15 @@ export function stepKnock(knock: Vec2, dt: number): { shift: Vec2; knock: Vec2 }
 
 export function stepSeagull(gull: Seagull, input: SeagullInput): SeagullStep {
   const dt = clampDt(input.dt);
+  if (gull.bubble > 0) {
+    return {
+      gull: { ...gull, bubble: Math.max(0, gull.bubble - dt), knock: { x: 0, z: 0 } },
+      contact: false,
+      pose: null,
+      rescueDone: false,
+      grabbed: false,
+    };
+  }
   let next: Seagull = { ...gull, phaseTime: gull.phaseTime + dt, grace: Math.max(0, gull.grace - dt) };
   const toPlayer = distance(next, input.player);
   let contact = false;

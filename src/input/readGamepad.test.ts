@@ -54,6 +54,14 @@ describe("readGamepadSnapshot", () => {
     expect(reading.pressedButtons.map((button) => button.index)).toEqual([1]);
   });
 
+  it("uses RT as the bubble button on a standard pad only", () => {
+    const xbox = readGamepadSnapshot(snapshot({ buttons: buttons([7]) }), 0.18);
+    const unknown = readGamepadSnapshot(snapshot({ mapping: "", buttons: buttons([7]) }), 0.18);
+    expect(xbox.shoot).toBe(true);
+    expect(xbox.ability).toBe(false);
+    expect(unknown.shoot).toBe(false);
+  });
+
   it("uses the X button as the ability on a standard pad only", () => {
     const xbox = readGamepadSnapshot(snapshot({ buttons: buttons([2]) }), 0.18);
     const unknown = readGamepadSnapshot(snapshot({ mapping: "", buttons: buttons([2]) }), 0.18);

@@ -1,8 +1,10 @@
 import { Color3 } from "@babylonjs/core/Maths/math.color";
+import { Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Scene } from "@babylonjs/core/scene";
 import { course, startingGrid } from "../movement/course";
+import { obstacleLayout } from "../movement/obstacles";
 
 /** Draws the nest, the three surface bands, and the finish gate. */
 export function createCourse(scene: Scene): void {
@@ -49,7 +51,46 @@ export function createCourse(scene: Scene): void {
   addNest(scene);
   addStartingGrid(scene);
   addRoute(scene);
+  addObstacles(scene);
   addFinishGate(scene);
+}
+
+/** Rocks and washed-up logs. The crawl is pushed out of these in the movement step. */
+function addObstacles(scene: Scene): void {
+  const rockMaterial = new StandardMaterial("obstacleRock", scene);
+  rockMaterial.diffuseColor = new Color3(0.48, 0.46, 0.42);
+  rockMaterial.specularColor = new Color3(0.04, 0.04, 0.04);
+  const pebbleMaterial = new StandardMaterial("obstaclePebble", scene);
+  pebbleMaterial.diffuseColor = new Color3(0.62, 0.58, 0.5);
+  pebbleMaterial.specularColor = new Color3(0.03, 0.03, 0.03);
+  const woodMaterial = new StandardMaterial("obstacleLog", scene);
+  woodMaterial.diffuseColor = new Color3(0.4, 0.28, 0.16);
+  woodMaterial.specularColor = new Color3(0.04, 0.03, 0.02);
+
+  for (const obstacle of obstacleLayout) {
+    if (obstacle.kind === "log") {
+      const log = MeshBuilder.CreateCylinder(obstacle.id, {
+        height: obstacle.length,
+        diameter: obstacle.radius * 2,
+        tessellation: 10,
+      }, scene);
+      log.position.set(obstacle.x, obstacle.radius, obstacle.z);
+      const along = new Vector3(Math.sin(obstacle.yaw), 0, Math.cos(obstacle.yaw));
+      const rotation = new Quaternion();
+      Quaternion.FromUnitVectorsToRef(Vector3.Up(), along, rotation);
+      log.rotationQuaternion = rotation;
+      log.material = woodMaterial;
+      continue;
+    }
+
+    const rock = MeshBuilder.CreateSphere(obstacle.id, { diameter: obstacle.radius * 2, segments: 10 }, scene);
+    rock.position.set(obstacle.x, obstacle.radius * 0.42, obstacle.z);
+    rock.scaling.y = 0.72;
+    rock.material = rockMaterial;
+    const pebble = MeshBuilder.CreateSphere(`${obstacle.id}-pebble`, { diameter: obstacle.radius * 0.7, segments: 8 }, scene);
+    pebble.position.set(obstacle.x + obstacle.radius * 0.45, obstacle.radius * 0.28, obstacle.z + obstacle.radius * 0.2);
+    pebble.material = pebbleMaterial;
+  }
 }
 
 function centerOf(minZ: number, maxZ: number): number {

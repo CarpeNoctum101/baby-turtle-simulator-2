@@ -122,6 +122,16 @@ function playCue(ctx: AudioContext, cue: AbilityCue): void {
     tone(ctx, 140, now, 0.1, "sawtooth", 0.06);
     return;
   }
+  if (cue === "bubble") {
+    tone(ctx, 620, now, 0.08, "sine", 0.05);
+    tone(ctx, 880, now + 0.05, 0.1, "sine", 0.04);
+    return;
+  }
+  if (cue === "bubble-trap") {
+    tone(ctx, 480, now, 0.12, "triangle", 0.05);
+    tone(ctx, 360, now + 0.08, 0.16, "sine", 0.04);
+    return;
+  }
   tone(ctx, 660, now, 0.08, "sine", 0.04);
   tone(ctx, 880, now + 0.1, 0.12, "sine", 0.03);
 }

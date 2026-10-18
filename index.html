@@ -7,6 +7,9 @@
   </head>
   <body>
     <canvas id="renderCanvas" tabindex="0"></canvas>
+    <div id="crosshair" hidden aria-hidden="true">
+      <span></span><span></span><span></span><span></span>
+    </div>
     <button id="hudToggle" type="button" aria-controls="hud" aria-expanded="true">Hide readout</button>
     <pre id="hud">Starting the beach scene…</pre>
     <p id="countdown" hidden>3</p>
@@ -43,6 +46,7 @@
         <p>Pick a turtle:</p>
         <div class="typePicker" role="radiogroup" aria-label="Turtle type"></div>
         <p>A second hatchling follows behind you. Sand Spray only catches a racer in the cloud behind your shell. The pale band at the shoreline is the wave zone.</p>
+        <p>Rocks and logs block the crawl, so steer around them. The crosshair shows where you are aiming. Left click, F, or RT shoots a bubble along the camera. A hit traps another turtle or a seagull for a short time.</p>
         <p>Watch for the seagull near the middle of the dry sand. It chases at a little under your speed, and a hit knocks you both back. If your health reaches zero it carries you back toward the nest.</p>
         <button id="startRace" type="button">Start race</button>
         <p class="credit">Seagull model by Bwinji Shamutete (Sketchfab), CC BY 4.0.</p>

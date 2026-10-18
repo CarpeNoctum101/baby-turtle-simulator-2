@@ -35,6 +35,8 @@ describe("ability effects across both turtle materials", () => {
         playerShell: turtle.shell,
         rivalSkin: rival.skin,
         rivalShell: rival.shell,
+        bubbles: [],
+        traps: [],
       };
       fx.sync(frame);
       expect(turtle.skin.emissiveColor.r).toBeGreaterThan(0);
