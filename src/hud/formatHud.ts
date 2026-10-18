@@ -30,7 +30,7 @@ export function formatHud(model: HudModel): string {
     `Active movement: ${model.movementSource === "keyboard" ? "Keyboard (WASD)" : "Gamepad left stick"}`,
     `Active look: ${model.lookSource === "mouse" ? "Mouse" : "Gamepad right stick"}`,
     "Hold the right mouse button and drag to look. The view stays still while you only hold W or stick up.",
-    "W or the left stick moves the way the camera looks. A, D, or the left stick move sideways. Only the right stick turns the camera. Space brakes. X uses the held ability. Left click, F, or RT shoots a bubble along the camera. R restarts. H hides this readout.",
+    "W or the left stick moves the way the camera looks. A, D, or the left stick move sideways. Only the right stick turns the camera. Space brakes. X or RT uses the held ability. Bubble Shot arms and fires on that same press. R restarts. H hides this readout.",
     `Ability: ${model.abilityLine}`,
     `[ and ] change the stick dead zone. Current dead zone: ${model.deadZone.toFixed(2)}`,
     formatGamepad(model.gamepad),
@@ -57,7 +57,7 @@ function formatGamepad(gamepad: GamepadReading): string {
   }
 
   const mappingLine = gamepad.usesStandardMapping
-    ? "Mapping: standard. Left stick moves, right stick looks, B brakes, X uses the held ability, and RT shoots a bubble."
+    ? "Mapping: standard. Left stick moves, right stick looks, B brakes, and RT uses the held ability. RT also fires Bubble Shot."
     : "Mapping: not standard. Axes 0 and 1 are used as a left stick. Buttons are not assigned, because this controller did not report the usual layout.";
   const axes = gamepad.axes.length > 0 ? gamepad.axes.slice(0, 8).map((value) => value.toFixed(2)).join(", ") : "none";
   const buttons =

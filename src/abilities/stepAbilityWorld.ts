@@ -39,7 +39,7 @@ import { collectTideOrbs, createTideOrbs, stepTideOrbs, type TideOrb } from "./p
 import { bubbleRules, consumeBubbleHits, launchBubble, stepBubbleShots, type BubbleShot } from "./bubble";
 import { createSandCloud, ownCloudRemaining, resolveSandClouds, stepSandClouds, type SandCloud } from "./sandSpray";
 import type { TurtleMotion } from "../movement/stepTurtle";
-import { catchInNet, createNetHazards, netRules, stepNetHazards, type NetHazards, type NetThrowerSpawn } from "../mob/netThrower";
+import { catchInNet, createNetHazards, netRules, stepNetHazards, struggleInNet, type NetHazards, type NetThrowerSpawn } from "../mob/netThrower";
 
 
 export type AbilityCue = "pickup" | "frenzy" | "shield" | "spray" | "block" | "bump" | "wave-arm" | "wave-boost" | "wave-miss" | "trail" | "snap" | "snap-hit" | "gull-hit" | "gull-swoop" | "slam" | "slam-hit" | "spin" | "net-catch" | "bubble" | "bubble-trap";
@@ -110,8 +110,18 @@ export interface AbilityTick {
   specialPressed?: boolean;
   /** True on the frame the bubble button goes down. */
   shoot?: boolean;
-  /** Camera forward on the ground. The bubble travels this way. */
+  /** True on an ability-trigger press while a net is slowing the player. */
+  struggle?: boolean;
+  /**
+   * True in an online room. The server rolls and spends Tide Orbs.
+   * Nets, seagulls, health, specials and an armed Bubble Shot still run here.
+   */
+  serverItems?: boolean;
+  /** True when the server is simulating nets, seagulls and bubbles for every player. */
+  sharedWorld?: boolean;
+  /** Camera look direction through the crosshair. The bubble travels this way, including up and down. */
   aimX?: number;
+  aimY?: number;
   aimZ?: number;
 }
 
@@ -152,8 +162,9 @@ export function stepAbilityWorld(world: AbilityWorld, tick: AbilityTick): Abilit
   let bubbles = world.bubbles;
   let bubbleCooldown = Math.max(0, world.bubbleCooldown - clampDt(tick.dt));
   const frozen = world.seagulls.some((gull) => isRescuePhase(gull.phase));
+  const netted = world.nets.slow.player > 0;
 
-  if (tick.racing && !frozen) {
+  if (tick.racing && !frozen && !netted && !tick.serverItems) {
     const pickup = collectTideOrbs(orbs, loadout, player, tick.random, tick.pool, tick.itemSlots ?? 1);
     orbs = pickup.orbs;
     loadout = pickup.loadout;
@@ -175,7 +186,7 @@ export function stepAbilityWorld(world: AbilityWorld, tick: AbilityTick): Abilit
     }
   }
 
-  if (tick.racing && !frozen && tick.special === "snap" && tick.specialPressed) {
+  if (tick.racing && !frozen && !netted && tick.special === "snap" && tick.specialPressed) {
     const bite = trySnap(snap, player, rival, rivalEffects);
     snap = bite.state;
     if (bite.started) {
@@ -205,12 +216,12 @@ export function stepAbilityWorld(world: AbilityWorld, tick: AbilityTick): Abilit
     }
   }
 
-  if (tick.racing && !frozen && tick.special === "slam" && tick.specialPressed && slamReady(slam)) {
+  if (tick.racing && !frozen && !netted && tick.special === "slam" && tick.specialPressed && slamReady(slam)) {
     slam = startSlam(slam, player.heading);
     cues.push("slam");
   }
 
-  if (tick.racing && !frozen && tick.special === "spin" && tick.specialPressed && spinReady(spin)) {
+  if (tick.racing && !frozen && !netted && tick.special === "spin" && tick.specialPressed && spinReady(spin)) {
     spin = { cooldownRemaining: spinRules.cooldown };
     loadout = { ...loadout, effects: { ...loadout.effects, spinRemaining: spinRules.duration } };
     cues.push("spin");
@@ -300,15 +311,33 @@ export function stepAbilityWorld(world: AbilityWorld, tick: AbilityTick): Abilit
     cues.push("bump");
   }
 
-  if (tick.racing && !frozen && tick.shoot && bubbleCooldown <= 0) {
-    const shot = launchBubble(player.x, player.z, tick.aimX ?? 0, tick.aimZ ?? 1);
+  const gun = loadout.effects;
+  const gunReady = gun.bubbleGunRemaining > 0 && gun.bubbleShotsLeft > 0;
+  if (!tick.sharedWorld && tick.racing && !frozen && !netted && tick.shoot && gunReady && bubbleCooldown <= 0) {
+    const shot = launchBubble(
+      player.x,
+      bubbleRules.spawnHeight,
+      player.z,
+      tick.aimX ?? 0,
+      tick.aimY ?? 0,
+      tick.aimZ ?? 1,
+    );
     if (shot) {
       bubbles = [...bubbles, shot];
       bubbleCooldown = bubbleRules.cooldown;
+      const shotsLeft = gun.bubbleShotsLeft - 1;
+      loadout = {
+        ...loadout,
+        effects: {
+          ...gun,
+          bubbleShotsLeft: shotsLeft,
+          bubbleGunRemaining: shotsLeft > 0 ? gun.bubbleGunRemaining : 0,
+        },
+      };
       cues.push("bubble");
     }
   }
-  if (tick.racing) {
+  if (!tick.sharedWorld && tick.racing) {
     bubbles = stepBubbleShots(bubbles, tick.dt);
     const caught = consumeBubbleHits(bubbles, [
       { id: "rival", x: rival.x, z: rival.z, y: 0.4 },
@@ -341,7 +370,7 @@ export function stepAbilityWorld(world: AbilityWorld, tick: AbilityTick): Abilit
   let playerKnock = world.playerKnock;
   let playerShift: Vec2 = { x: 0, z: 0 };
   let playerLift = 0;
-  if (tick.racing) {
+  if (tick.racing && !tick.sharedWorld) {
     let rescueDone = false;
     seagulls = seagulls.map((gull) => {
       const step = stepSeagull(gull, { dt: tick.dt, player, canAttack: !frozen });
@@ -394,7 +423,9 @@ export function stepAbilityWorld(world: AbilityWorld, tick: AbilityTick): Abilit
     }
   }
 
-  const netTick = stepNetHazards(world.nets, {
+  const netTick = tick.sharedWorld
+    ? { state: world.nets, hits: [] as ("player" | "rival")[] }
+    : stepNetHazards(world.nets, {
     dt: tick.dt, racing: tick.racing, player, rival,
     playerGrounded: playerLift < 0.5 && !slamming && !seagulls.some(gull => isRescuePhase(gull.phase)),
   });
@@ -414,6 +445,9 @@ export function stepAbilityWorld(world: AbilityWorld, tick: AbilityTick): Abilit
     } else {
       rival = { ...rival, speed: rival.speed * netRules.slowMultiplier };
     }
+  }
+  if (tick.struggle && nets.slow.player > 0) {
+    nets = struggleInNet(nets, "player");
   }
 
   const hadBoost = loadout.effects.waveBoostRemaining > 0;
@@ -461,6 +495,7 @@ function cueFor(ability: AbilityId): AbilityCue {
   if (ability === "shell-guard") return "shield";
   if (ability === "sand-spray") return "spray";
   if (ability === "wave-rider") return "wave-arm";
+  if (ability === "bubble-shot") return "bubble";
   return "trail";
 }
 

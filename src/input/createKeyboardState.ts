@@ -1,3 +1,5 @@
+import { isTypingTarget } from "./keyboard";
+
 const handledKeys = new Set([
   "KeyW",
   "KeyA",
@@ -21,6 +23,9 @@ export function createKeyboardState(target: Window): KeyboardState {
   const keys = new Set<string>();
 
   const onKeyDown = (event: KeyboardEvent) => {
+    if (isTypingTarget(event.target)) {
+      return;
+    }
     keys.add(event.code);
     if (handledKeys.has(event.code)) {
       event.preventDefault();

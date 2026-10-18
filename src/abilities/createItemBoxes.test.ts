@@ -19,6 +19,7 @@ describe("question-mark item boxes", () => {
         rivalEffects: createLoadout().effects, blockFlash: 0, playerX: -5.5, playerZ: -16,
         trail: false, waveArmed: false, waveBoost: false,
         playerSkin: turtle.skin, playerShell: turtle.shell, rivalSkin: rival.skin, rivalShell: rival.shell,
+        bubbles: [], traps: [],
       };
       fx.sync(frame);
       expect(pickup.granted).toBe("flipper-frenzy");

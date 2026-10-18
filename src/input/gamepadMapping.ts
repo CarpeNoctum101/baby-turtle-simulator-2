@@ -11,7 +11,7 @@ export const standardStickMapping: StickMapping = {
   lookXAxis: 2,
   lookYAxis: 3,
   brakeButton: 1,
-  abilityButton: 2,
+  abilityButton: 7,
   snapButton: 3,
   shootButton: 7,
   invertThrottle: true,

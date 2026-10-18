@@ -11,6 +11,9 @@ export function abilityIcon(id: AbilityId): string {
   if (id === "sand-spray") {
     return `<svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="24" cy="36" r="10" fill="#e6d2a2"/><circle cx="38" cy="30" r="8" fill="#f0e2bc"/><circle cx="40" cy="42" r="6" fill="#c9b07a"/></svg>`;
   }
+  if (id === "bubble-shot") {
+    return `<svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="34" cy="30" r="14" fill="#9fd8ee" fill-opacity="0.85"/><circle cx="28" cy="24" r="4" fill="#f4fbff"/><circle cx="18" cy="44" r="6" fill="#9fd8ee" fill-opacity="0.7"/></svg>`;
+  }
   if (id === "wave-rider") {
     return `<svg viewBox="0 0 64 64" aria-hidden="true"><path fill="none" stroke="#8fd0ea" stroke-width="4" stroke-linecap="round" d="M10 28c6 8 10 8 16 0s10-8 16 0 10 8 12 0"/><path fill="none" stroke="#d7f3ff" stroke-width="3" stroke-linecap="round" d="M12 42c6 6 10 6 16 0s10-6 16 0 8 6 10 0"/></svg>`;
   }

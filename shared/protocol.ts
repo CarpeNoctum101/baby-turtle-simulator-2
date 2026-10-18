@@ -3,6 +3,7 @@
  * The browser sends intents. The room decides the countdown, the orbs, the abilities and the finishing order.
  */
 import { abilityCatalog, type AbilityId } from "../src/abilities/catalog";
+import { readWorldMessage, type WorldView } from "./beachHazards";
 
 export const roomCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -59,7 +60,10 @@ export type ClientMessage =
   | { type: "finish" }
   | { type: "rematch" }
   | { type: "reset" }
-  | { type: "leave" };
+  | { type: "leave" }
+  | { type: "shot"; x: number; y: number; z: number; dirX: number; dirY: number; dirZ: number }
+  | { type: "struggle" }
+  | { type: "body"; maxHealth: number };
 
 export interface WelcomeMessage {
   type: "welcome";
@@ -151,6 +155,10 @@ export interface FinishMessage {
   ms: number;
 }
 
+export interface WorldMessage extends WorldView {
+  type: "world";
+}
+
 export interface RejectedActionMessage {
   type: "rejected";
   action: "ready" | "start" | "pickup" | "ability" | "finish" | "rematch";
@@ -169,6 +177,7 @@ export type ServerMessage =
   | AbilityMessage
   | FinishMessage
   | RejectedActionMessage
+  | WorldMessage
   | ErrorMessage;
 
 export function isRoomCode(value: string): boolean {
@@ -240,6 +249,15 @@ export function parseClientMessage(raw: string): ClientMessage | null {
   if (value.type === "leave") {
     return { type: "leave" };
   }
+  if (value.type === "struggle") {
+    return { type: "struggle" };
+  }
+  if (value.type === "body" && isTurtleHealth(value.maxHealth)) {
+    return { type: "body", maxHealth: value.maxHealth };
+  }
+  if (value.type === "shot" && isAim(value.x) && isAim(value.y) && isAim(value.z) && isAim(value.dirX) && isAim(value.dirY) && isAim(value.dirZ)) {
+    return { type: "shot", x: value.x, y: value.y, z: value.z, dirX: value.dirX, dirY: value.dirY, dirZ: value.dirZ };
+  }
   return null;
 }
 
@@ -247,6 +265,9 @@ export function parseServerMessage(raw: string): ServerMessage | null {
   const value = parseObject(raw);
   if (!value || typeof value.type !== "string") {
     return null;
+  }
+  if (value.type === "world") {
+    return readWorldMessage(value);
   }
   if (value.type === "error" && typeof value.message === "string" && value.message.length <= 200) {
     return { type: "error", message: value.message };
@@ -464,6 +485,14 @@ function optionalStamp(value: unknown): number | null | undefined {
     return null;
   }
   return isStamp(value) ? value : undefined;
+}
+
+function isAim(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && Math.abs(value) < 500;
+}
+
+function isTurtleHealth(value: unknown): value is number {
+  return value === 35 || value === 50 || value === 58 || value === 75;
 }
 
 function isStamp(value: unknown): value is number {

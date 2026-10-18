@@ -7,8 +7,12 @@ export const netRules = {
   flightSeconds: 1.1,
   groundSeconds: 1.8,
   cooldownSeconds: 5.5,
-  slowSeconds: 2.6,
-  slowMultiplier: 0.55,
+  slowSeconds: 5.2,
+  /** Presses needed to clear a fresh net if you do not wait for the timer. */
+  escapePresses: 7,
+  /** Each press removes one seventh of a fresh net. */
+  struggleSeconds: 5.2 / 7,
+  slowMultiplier: 0.32,
   graceSeconds: 1.2,
   catchRadius: 1.65,
   range: 20,
@@ -96,6 +100,19 @@ export function catchInNet(state: NetHazards, racer: NetRacer): NetHazards {
 
 export function netSpeedScale(state: NetHazards, racer: NetRacer): number {
   return state.slow[racer] > 0 ? netRules.slowMultiplier : 1;
+}
+
+/** One mash of the ability trigger. Holding the button does not count as extra presses. */
+export function struggleInNet(state: NetHazards, racer: NetRacer): NetHazards {
+  if (state.slow[racer] <= 0) {
+    return state;
+  }
+  const cut = Math.min(state.slow[racer], netRules.struggleSeconds);
+  return {
+    ...state,
+    slow: { ...state.slow, [racer]: state.slow[racer] - cut },
+    grace: { ...state.grace, [racer]: Math.max(0, state.grace[racer] - cut) },
+  };
 }
 
 function inRange(thrower: NetThrower, racer: TurtleMotion): boolean {

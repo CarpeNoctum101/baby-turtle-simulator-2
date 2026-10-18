@@ -21,10 +21,28 @@ export const obstacleBodyRadius = 0.55;
 
 /** True when a circle overlaps a rock or the length of a log. */
 export function overlapsObstacle(x: number, z: number, radius: number): boolean {
-  return obstacleLayout.some((obstacle) => {
-    const closest = closestPoint(obstacle, x, z);
-    return Math.hypot(x - closest.x, z - closest.z) < obstacle.radius + radius;
-  });
+  return obstacleLayout.some((obstacle) => overlapsFlat(obstacle, x, z, radius));
+}
+
+/**
+ * Highest solid top under this circle, measured from the sand.
+ * A bubble above that height flies over the rock or log. Open sand returns 0.
+ */
+export function obstacleTop(x: number, z: number, radius: number): number {
+  let top = 0;
+  for (const obstacle of obstacleLayout) {
+    if (!overlapsFlat(obstacle, x, z, radius)) {
+      continue;
+    }
+    const height = obstacle.kind === "log" ? obstacle.radius * 2 : obstacle.radius * 1.14;
+    top = Math.max(top, height);
+  }
+  return top;
+}
+
+function overlapsFlat(obstacle: CourseObstacle, x: number, z: number, radius: number): boolean {
+  const closest = closestPoint(obstacle, x, z);
+  return Math.hypot(x - closest.x, z - closest.z) < obstacle.radius + radius;
 }
 
 /**

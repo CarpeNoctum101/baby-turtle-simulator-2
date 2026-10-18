@@ -38,6 +38,9 @@ interface RemoteTurtle extends RemoteLook {
   sample: RemoteSample;
   rendered: SamplePose;
   shield: Mesh;
+  trap: Mesh;
+  net: Mesh;
+  lift: number;
   trail: Mesh[];
   trailMaterial: StandardMaterial;
 }
@@ -70,6 +73,9 @@ export function createRemoteTurtles(scene: Scene) {
       sample: createRemoteSample(pose),
       rendered: pose,
       shield: createShield(scene, bodyId, body),
+      trap: createTrap(scene, bodyId, body),
+      net: createNetMark(scene, bodyId, body),
+      lift: 0,
       trail: trail.markers,
       trailMaterial: trail.material,
       ...blankLook(),
@@ -143,6 +149,15 @@ export function createRemoteTurtles(scene: Scene) {
     remove(playerId: string) {
       drop(playerId);
     },
+    showCatch(playerId: string, net: boolean, bubble: boolean, lift: number) {
+      const remote = turtles.get(playerId);
+      if (!remote) {
+        return;
+      }
+      remote.net.isVisible = net;
+      remote.trap.isVisible = bubble;
+      remote.lift = lift;
+    },
     applyPose(message: PoseMessage) {
       if (message.playerId === selfId) {
         return;
@@ -178,7 +193,7 @@ function poseOf(pose: { x: number; z: number; heading: number; speed: number }):
 }
 
 function place(remote: RemoteTurtle, pose: SamplePose) {
-  remote.body.root.position.set(pose.x, 0, pose.z);
+  remote.body.root.position.set(pose.x, remote.lift, pose.z);
   remote.body.root.rotation.y = pose.heading;
 }
 
@@ -248,6 +263,33 @@ function createShield(scene: Scene, id: string, body: PlaceholderTurtle): Mesh {
   shield.material = material;
   shield.isVisible = false;
   return shield;
+}
+
+function createTrap(scene: Scene, id: string, body: PlaceholderTurtle): Mesh {
+  const trap = MeshBuilder.CreateSphere(`${id}Bubble`, { diameter: 1.8, segments: 12 }, scene);
+  trap.position.y = 0.4;
+  trap.parent = body.visual;
+  const material = new StandardMaterial(`${id}BubbleMaterial`, scene);
+  material.diffuseColor = new Color3(0.55, 0.82, 0.95);
+  material.emissiveColor = new Color3(0.25, 0.55, 0.7);
+  material.alpha = 0.35;
+  material.transparencyMode = Material.MATERIAL_ALPHABLEND;
+  material.backFaceCulling = false;
+  trap.material = material;
+  trap.isVisible = false;
+  return trap;
+}
+
+function createNetMark(scene: Scene, id: string, body: PlaceholderTurtle): Mesh {
+  const net = MeshBuilder.CreateTorus(`${id}Net`, { diameter: 1.5, thickness: 0.08, tessellation: 16 }, scene);
+  net.position.y = 0.2;
+  net.parent = body.root;
+  const material = new StandardMaterial(`${id}NetMaterial`, scene);
+  material.diffuseColor = new Color3(0.9, 0.78, 0.45);
+  material.emissiveColor = new Color3(0.35, 0.25, 0.08);
+  net.material = material;
+  net.isVisible = false;
+  return net;
 }
 
 function createTrail(scene: Scene, id: string): { markers: Mesh[]; material: StandardMaterial } {

@@ -49,7 +49,7 @@ export function createAbilityFx(scene: Scene, playerVisual: TransformNode): Abil
   const shield = createShield(scene, playerVisual);
   const wave = createWaveBand(scene);
   const trail = createTrail(scene);
-  const bubbleShots = createBubbleMeshes(scene, "bubbleShot", 4, 0.55);
+  const bubbleShots = createBubbleMeshes(scene, "bubbleShot", 12, 0.55);
   const bubbleTraps = createBubbleMeshes(scene, "bubbleTrap", 5, 1.7);
   createDebris(scene);
 

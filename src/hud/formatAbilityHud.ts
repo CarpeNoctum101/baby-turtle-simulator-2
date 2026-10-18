@@ -1,7 +1,7 @@
 import { abilityCatalog, waveRules, type AbilityId } from "../abilities/catalog";
 import type { RacerEffects } from "../abilities/abilityState";
 
-export type AbilityHudTone = "empty" | "active" | "shield" | "spray" | "wave" | "trail";
+export type AbilityHudTone = "empty" | "active" | "shield" | "spray" | "wave" | "trail" | "bubble";
 
 export interface AbilityHudInput {
   held: AbilityId | null;
@@ -67,6 +67,14 @@ function activeTimer(input: AbilityHudInput): AbilityTimer | null {
   }
   if (effects.sprayRemaining > 0) {
     return timer("Sand Spray", effects.sprayRemaining, abilityCatalog["sand-spray"].duration, "spray");
+  }
+  if (effects.bubbleGunRemaining > 0 && effects.bubbleShotsLeft > 0) {
+    const secondsLeft = seconds(effects.bubbleGunRemaining);
+    return {
+      label: `Bubble Shot ${effects.bubbleShotsLeft} left · ${secondsLeft}s`,
+      meter: fraction(effects.bubbleGunRemaining, abilityCatalog["bubble-shot"].duration),
+      tone: "bubble",
+    };
   }
   return null;
 }

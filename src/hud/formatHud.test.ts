@@ -63,7 +63,7 @@ describe("formatHud", () => {
       },
     });
     expect(text).toContain("B brakes");
-    expect(text).toContain("X uses the held ability");
+    expect(text).toContain("RT uses the held ability");
     expect(text).toContain("B (1)");
     expect(text).toContain("Active movement: Gamepad left stick");
   });

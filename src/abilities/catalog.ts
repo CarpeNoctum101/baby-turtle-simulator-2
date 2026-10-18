@@ -1,4 +1,4 @@
-export type AbilityId = "flipper-frenzy" | "shell-guard" | "sand-spray" | "wave-rider" | "magnetic-sense";
+export type AbilityId = "flipper-frenzy" | "shell-guard" | "sand-spray" | "wave-rider" | "magnetic-sense" | "bubble-shot";
 
 export interface AbilityRules {
   id: AbilityId;
@@ -52,6 +52,11 @@ export const waveRules = {
   accelerationMultiplier: 1.25,
 } as const;
 
+/** Bubble Shot is spent from an item box. It is not available before that pickup. */
+export const bubbleShotRules = {
+  shots: 3,
+} as const;
+
 export const abilityCatalog: Record<AbilityId, AbilityRules> = {
   "flipper-frenzy": {
     id: "flipper-frenzy",
@@ -74,7 +79,7 @@ export const abilityCatalog: Record<AbilityId, AbilityRules> = {
   "wave-rider": {
     id: "wave-rider",
     name: "Wave Rider",
-    summary: "Press X as you enter the shoreline waves.",
+    summary: "Press X or RT as you enter the shoreline waves.",
     duration: 1.35,
   },
   "magnetic-sense": {
@@ -83,10 +88,16 @@ export const abilityCatalog: Record<AbilityId, AbilityRules> = {
     summary: "Shows a trail toward the sea.",
     duration: 7,
   },
+  "bubble-shot": {
+    id: "bubble-shot",
+    name: "Bubble Shot",
+    summary: "Three bubbles toward the crosshair.",
+    duration: 8,
+  },
 };
 
 /** The first three abilities. Tests can use this pool on its own. */
 export const starterAbilityPool: readonly AbilityId[] = ["flipper-frenzy", "shell-guard", "sand-spray"];
 
-/** Every Tide Orb ability, still rolled with equal odds. */
-export const raceAbilityPool: readonly AbilityId[] = [...starterAbilityPool, "wave-rider", "magnetic-sense"];
+/** Every Tide Orb ability, online and local, still with equal odds. */
+export const raceAbilityPool: readonly AbilityId[] = [...starterAbilityPool, "wave-rider", "magnetic-sense", "bubble-shot"];

@@ -1,6 +1,7 @@
 import type { CrawlModifiers } from "../movement/stepTurtle";
 import {
   abilityCatalog,
+  bubbleShotRules,
   collisionSpeedScale,
   frenzyRules,
   sandRules,
@@ -36,6 +37,10 @@ export interface RacerEffects {
   stunRemaining: number;
   /** A bubble holds the turtle in place. It wears off on its own. */
   bubbleRemaining: number;
+  /** Seconds left to fire Bubble Shot. Zero means the powerup is over. */
+  bubbleGunRemaining: number;
+  /** Shots left in the current Bubble Shot. */
+  bubbleShotsLeft: number;
 }
 
 export interface AbilityLoadout {
@@ -58,6 +63,8 @@ export function createEffects(): RacerEffects {
     spinRemaining: 0,
     stunRemaining: 0,
     bubbleRemaining: 0,
+    bubbleGunRemaining: 0,
+    bubbleShotsLeft: 0,
   };
 }
 
@@ -156,6 +163,7 @@ export function speedModifiers(effects: RacerEffects): CrawlModifiers {
 export function stepEffects(effects: RacerEffects, dt: number): RacerEffects {
   const step = clampDt(dt);
   const shieldRemaining = Math.max(0, effects.shieldRemaining - step);
+  const bubbleGunRemaining = Math.max(0, effects.bubbleGunRemaining - step);
   return {
     frenzyRemaining: Math.max(0, effects.frenzyRemaining - step),
     shieldRemaining,
@@ -168,6 +176,8 @@ export function stepEffects(effects: RacerEffects, dt: number): RacerEffects {
     spinRemaining: Math.max(0, effects.spinRemaining - step),
     stunRemaining: Math.max(0, effects.stunRemaining - step),
     bubbleRemaining: Math.max(0, effects.bubbleRemaining - step),
+    bubbleGunRemaining,
+    bubbleShotsLeft: bubbleGunRemaining > 0 ? effects.bubbleShotsLeft : 0,
   };
 }
 
@@ -191,7 +201,8 @@ export function abilityIsRunning(effects: RacerEffects): boolean {
     effects.sprayRemaining > 0 ||
     effects.waveWindowRemaining > 0 ||
     effects.waveBoostRemaining > 0 ||
-    effects.trailRemaining > 0
+    effects.trailRemaining > 0 ||
+    effects.bubbleGunRemaining > 0
   );
 }
 
@@ -249,6 +260,19 @@ export function beginAbility(
       loadout: {
         ...spent,
         effects: { ...loadout.effects, trailRemaining: rules.duration },
+      },
+    };
+  }
+  if (ability === "bubble-shot") {
+    return {
+      started: true,
+      loadout: {
+        ...spent,
+        effects: {
+          ...loadout.effects,
+          bubbleGunRemaining: rules.duration,
+          bubbleShotsLeft: bubbleShotRules.shots,
+        },
       },
     };
   }

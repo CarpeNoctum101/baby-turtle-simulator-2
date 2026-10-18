@@ -42,9 +42,10 @@ describe("tide orbs", () => {
     expect(rollAbility(() => 0.34, starterAbilityPool)).toBe("shell-guard");
     expect(rollAbility(() => 0.67, starterAbilityPool)).toBe("sand-spray");
     expect(rollAbility(() => 0.99, starterAbilityPool)).toBe("sand-spray");
-    expect(raceAbilityPool).toEqual(["flipper-frenzy", "shell-guard", "sand-spray", "wave-rider", "magnetic-sense"]);
+    expect(raceAbilityPool).toEqual(["flipper-frenzy", "shell-guard", "sand-spray", "wave-rider", "magnetic-sense", "bubble-shot"]);
     expect(rollAbility(() => 0.6, raceAbilityPool)).toBe("wave-rider");
-    expect(rollAbility(() => 0.99, raceAbilityPool)).toBe("magnetic-sense");
+    expect(rollAbility(() => 0.7, raceAbilityPool)).toBe("magnetic-sense");
+    expect(rollAbility(() => 0.99, raceAbilityPool)).toBe("bubble-shot");
     const spent = createTideOrbs().map((orb) => ({ ...orb, respawnIn: 0.04 }));
     const back = stepTideOrbs(spent, 0.05);
     expect(back.every((orb) => orb.respawnIn === 0)).toBe(true);

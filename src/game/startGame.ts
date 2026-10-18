@@ -1,7 +1,7 @@
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { Scene } from "@babylonjs/core/scene";
-import { applySandSlow, createEffects, isTrailVisible, resolveWaveWindow, speedModifiers, stepLoadout, type AbilityLoadout, type RacerEffects } from "../abilities/abilityState";
-import { abilityCatalog, raceAbilityPool, sandRules, shellRules, type AbilityId } from "../abilities/catalog";
+import { applySandSlow, beginAbility, createEffects, isTrailVisible, resolveWaveWindow, speedModifiers, stepLoadout, type AbilityLoadout, type RacerEffects } from "../abilities/abilityState";
+import { abilityCatalog, bubbleShotRules, raceAbilityPool, sandRules, shellRules, type AbilityId } from "../abilities/catalog";
 import { exhaustionScale } from "../abilities/health";
 import { orbPickupRadius, tideOrbSpots, type TideOrb } from "../abilities/pickups";
 import { createAbilityFx } from "../abilities/renderAbilityFx";
@@ -9,8 +9,9 @@ import { createSandCloud, stepSandClouds } from "../abilities/sandSpray";
 import { lungeExtension } from "../abilities/snap";
 import { spinRules } from "../abilities/specials";
 import { createAbilityWorld, stepAbilityWorld, type AbilityCue, type AbilityWorld } from "../abilities/stepAbilityWorld";
+import type { WorldView } from "../../shared/beachHazards";
 import { createAbilityCues } from "../audio/abilityCues";
-import { createFollowCamera, resetFollowCamera, updateFollowCamera } from "../camera/createThirdPersonCamera";
+import { aimThroughCrosshair, createFollowCamera, resetFollowCamera, updateFollowCamera } from "../camera/createThirdPersonCamera";
 import { abilityIcon } from "../hud/abilityIcon";
 import { formatAbilityHud, formatAbilityLine, formatPlace } from "../hud/formatAbilityHud";
 import { formatHealth, formatSpecial } from "../hud/formatHealthHud";
@@ -157,8 +158,9 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
   let hudVisible = !beachPreview;
   const heldEdges = new Set<string>();
   let online = false;
+  let sharedBeach: WorldView | null = null;
 
-  const freshWorld = () => createAbilityWorld(turtleType.maxHealth, seagullSpawns, online ? [] : netThrowerSpawns);
+  const freshWorld = () => createAbilityWorld(turtleType.maxHealth, seagullSpawns, netThrowerSpawns);
 
   const placeTurtle = (body: PlaceholderTurtle, next: TurtleMotion, lift = 0) => {
     body.root.position.set(next.x, lift, next.z);
@@ -181,8 +183,13 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     picker.replaceChildren();
     const onPick = (event: Event) => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-turtle-type]");
-      if (button && !online && (race.phase === "ready" || race.phase === "finished")) {
+      const picking = (!online && (race.phase === "ready" || race.phase === "finished")) || (online && onlinePhase === "lobby");
+      if (button && picking) {
         applyTurtleType(button.dataset.turtleType as TurtleTypeId);
+        if (online) {
+          resetCombat();
+          session?.sendBody(turtleType.maxHealth);
+        }
       }
     };
     for (const type of turtleTypeList) {
@@ -459,7 +466,12 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
         ui.lobbyBar.hidden = false;
         ui.onlineStatus.textContent = "";
         renderLobby();
+        session?.sendBody(turtleType.maxHealth);
         canvas.focus();
+      },
+      onWorld: (message) => {
+        sharedBeach = message;
+        paintSharedBeach();
       },
       onRoster: (message) => {
         onlineHostId = message.hostId;
@@ -520,11 +532,14 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
         const remaining = Math.max(0, (message.until - (Date.now() + clockOffset)) / 1000);
         const untilLocal = message.until - clockOffset;
         if (message.playerId === selfId) {
+          const echo = message.ability === "bubble-shot" && world.loadout.effects.bubbleGunRemaining > 0;
           world = {
             ...world,
             loadout: showServerAbility(world.loadout, message.ability, remaining),
           };
-          cues.play(cueForAbility(message.ability));
+          if (!echo) {
+            cues.play(cueForAbility(message.ability));
+          }
         } else {
           remotes.showAbility(message.playerId, message.ability, untilLocal);
         }
@@ -707,6 +722,86 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     return true;
   };
 
+  const paintSharedBeach = () => {
+    if (!sharedBeach) {
+      return;
+    }
+    const seagulls = sharedBeach.seagulls.map((gull) => {
+      const existing = world.seagulls.find((entry) => entry.id === gull.id);
+      const home = existing?.home ?? { x: gull.x, z: gull.z };
+      return {
+        ...(existing ?? {
+          id: gull.id,
+          home,
+          x: gull.x,
+          y: gull.y,
+          z: gull.z,
+          heading: gull.heading,
+          phase: gull.phase,
+          phaseTime: 0,
+          knock: { x: 0, z: 0 },
+          grace: 0,
+          carryFrom: home,
+          carryTo: home,
+          flier: gull.flier,
+          bubble: gull.bubble,
+          diveTo: { x: gull.diveX, z: gull.diveZ },
+          diveFrom: { x: gull.x, y: gull.y, z: gull.z },
+        }),
+        x: gull.x,
+        y: gull.y,
+        z: gull.z,
+        heading: gull.heading,
+        phase: gull.phase,
+        bubble: gull.bubble,
+        flier: gull.flier,
+        diveTo: { x: gull.diveX, z: gull.diveZ },
+      };
+    });
+    const me = sharedBeach.racers.find((racer) => racer.id === selfId);
+    world = {
+      ...world,
+      seagulls,
+      bubbles: sharedBeach.bubbles.map((bubble) => ({ ...bubble, dirX: 0, dirY: 0, dirZ: 1, age: 0 })),
+      nets: {
+        throwers: sharedBeach.nets.map((net) => ({
+          id: net.id,
+          x: net.x,
+          z: net.z,
+          side: net.x < 0 ? -1 as const : 1 as const,
+          phase: net.phase,
+          time: net.time,
+          target: { x: net.targetX, z: net.targetZ },
+          hit: { player: false, rival: false },
+        })),
+        slow: { player: me?.netSlow ?? 0, rival: 0 },
+        grace: { player: 0, rival: 0 },
+      },
+      playerHealth: me ? { current: Math.round(me.health), max: me.maxHealth } : world.playerHealth,
+      loadout: me
+        ? {
+          ...world.loadout,
+          effects: {
+            ...world.loadout.effects,
+            bubbleRemaining: me.bubble,
+            bubbleShotsLeft: me.gunShots,
+            bubbleGunRemaining: me.gunSeconds,
+          },
+        }
+        : world.loadout,
+    };
+    if (me && me.lift > 0) {
+      motion = { ...motion, x: me.x, z: me.z, speed: 0 };
+      playerLift = me.lift;
+      controlsLocked = true;
+    }
+    for (const racer of sharedBeach.racers) {
+      if (racer.id !== selfId) {
+        remotes.showCatch(racer.id, racer.netSlow > 0, racer.bubble > 0, racer.lift);
+      }
+    }
+  };
+
   engine.runRenderLoop(() => {
     const dt = engine.getDeltaTime() / 1000;
     clock += dt;
@@ -739,16 +834,18 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     const gamepad = pollGamepads(controlSettings.stickDeadZone);
     const limited = limitInput(inputChoice, readKeyboard(keyboard.keys), gamepad);
     const movement = combineMovement(limited.keyboard, limited.gamepad);
-    const canOnlineDrive = onlinePhase === "lobby" || (onlinePhase === "racing" && selfPlace === 0);
+    const canOnlineDrive = onlinePhase === "lobby" || onlinePhase === "countdown" || (onlinePhase === "racing" && selfPlace === 0);
     const localDrive = canDrive(race.phase) && !controlsLocked;
-    const drive = !ending && (online ? canOnlineDrive : localDrive) ? movement : idleDrive;
+    const drive = !ending && (online ? canOnlineDrive && !controlsLocked : localDrive) ? movement : idleDrive;
+    const netted = world.nets.slow.player > 0;
+    // Keyboard X and controller RT are the same ability press. RT also fires Bubble Shot.
     const abilityDown = (inputChoice !== "gamepad" && keyboard.keys.has("KeyX")) || limited.gamepad.ability;
-    const activate = abilityDown && !abilityWasDown;
+    const abilityPressed = abilityDown && !abilityWasDown;
     abilityWasDown = abilityDown;
     const specialDown = (inputChoice !== "gamepad" && keyboard.keys.has("KeyE")) || limited.gamepad.snap;
-    const specialPressed = specialDown && !specialWasDown;
+    const specialPressed = !netted && specialDown && !specialWasDown;
     specialWasDown = specialDown;
-    const shootDown = keyboard.keys.has("KeyF") || mouse.shooting || gamepad.shoot;
+    const shootDown = abilityDown || (inputChoice !== "gamepad" && (keyboard.keys.has("KeyF") || mouse.shooting));
     const shootPressed = shootDown && !shootWasDown;
     shootWasDown = shootDown;
     if (ending) {
@@ -764,13 +861,28 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
       );
     }
 
-    const aim = planFromYaw(look.yaw);
+    const aim = aimThroughCrosshair(look);
+    let pendingAbility: AbilityId | null = null;
+    if (online && onlinePhase === "racing" && selfPlace === 0 && abilityPressed && !netted && world.loadout.held) {
+      pendingAbility = world.loadout.held;
+      if (pendingAbility === "bubble-shot") {
+        const started = beginAbility(world.loadout, pendingAbility);
+        if (started.started) {
+          world = { ...world, loadout: started.loadout };
+          cues.play("bubble");
+        }
+      }
+    }
     let shift = { x: 0, z: 0 };
-    if (race.phase === "racing" && !online) {
+    const onlineLive = online && !ending && selfPlace === 0 && (onlinePhase === "countdown" || onlinePhase === "racing");
+    let hazardsSimulated = false;
+    if ((race.phase === "racing" && !online) || onlineLive) {
+      hazardsSimulated = true;
       const ticked = stepAbilityWorld(world, {
         dt,
-        racing: true,
-        activate,
+        racing: online ? onlinePhase === "racing" : true,
+        activate: online ? false : !netted && abilityPressed,
+        struggle: !online && netted && abilityPressed,
         player: motion,
         rival,
         inWaveZone: isInWaveZone(motion.x, motion.z),
@@ -779,9 +891,12 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
         itemSlots: turtleType.itemSlots,
         special: turtleType.special,
         specialPressed,
-        shoot: !controlsLocked && shootPressed,
-        aimX: aim.forwardX,
-        aimZ: aim.forwardZ,
+        shoot: !online && !netted && !controlsLocked && shootPressed,
+        aimX: aim.x,
+        aimY: aim.y,
+        aimZ: aim.z,
+        serverItems: online,
+        sharedWorld: online,
       });
       world = ticked.world;
       rescuing = ticked.rescuing;
@@ -801,6 +916,9 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
       }
       lastHealth = world.playerHealth.current;
     }
+    if (online) {
+      paintSharedBeach();
+    }
 
     if (!online && (race.phase === "racing" || race.phase === "countdown")) {
       const playerPace = turtleType.speedScale * exhaustionScale(world.playerHealth) * netSpeedScale(world.nets, "player");
@@ -814,8 +932,14 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
         rival = stepRival(rival, motion, dt, scaleCrawl(speedModifiers(world.rivalEffects),
           exhaustionScale(world.rivalHealth) * netSpeedScale(world.nets, "rival")));
       }
-    } else if (online && canOnlineDrive && !ending) {
-      motion = stepTurtle(motion, drive, dt, planFromYaw(look.yaw), speedModifiers(world.loadout.effects));
+    } else if (online && canOnlineDrive && !ending && playerLift <= 0) {
+      const playerPace = turtleType.speedScale * exhaustionScale(world.playerHealth) * netSpeedScale(world.nets, "player");
+      motion = stepTurtle(motion, drive, dt, planFromYaw(look.yaw), scaleCrawl(speedModifiers(world.loadout.effects), playerPace));
+      motion = {
+        ...motion,
+        x: clampToBeach(motion.x + shift.x),
+        z: clampToCourse(motion.z + shift.z),
+      };
     }
     if (!ending && playerLift <= 0) {
       const pushed = pushOutOfObstacles(motion.x, motion.z);
@@ -825,11 +949,6 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
       const pushed = pushOutOfObstacles(rival.x, rival.z);
       rival = { ...rival, x: clampToBeach(pushed.x), z: clampToCourse(pushed.z) };
     }
-    const reachedFinish = race.phase === "racing" && isInFinishZone(motion.x, motion.z);
-    race = stepRace(race, dt, reachedFinish);
-    if (reachedFinish) {
-      ending = createEndingState(motion);
-      spaceEnding.begin();
     if (online && !ending) {
       const serverNow = Date.now() + clockOffset;
       const wave = onlinePhase === "racing" && selfPlace === 0
@@ -840,13 +959,21 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
       }
       world = {
         ...world,
-        loadout: stepLoadout({ ...world.loadout, effects: wave.effects }, dt),
+        loadout: hazardsSimulated
+          ? { ...world.loadout, effects: wave.effects }
+          : stepLoadout({ ...world.loadout, effects: wave.effects }, dt),
         orbs: visualOrbs(serverOrbs, serverNow),
-        clouds: stepSandClouds(world.clouds, dt),
+        clouds: hazardsSimulated ? world.clouds : stepSandClouds(world.clouds, dt),
       };
       if (onlinePhase === "racing" && selfPlace === 0 && session) {
-        if (activate && world.loadout.held) {
-          session.sendAbility(world.loadout.held);
+        if (pendingAbility) {
+          session.sendAbility(pendingAbility);
+        }
+        if (shootPressed && !netted && !controlsLocked) {
+          session.sendShot(motion.x, 0.55, motion.z, aim.x, aim.y, aim.z);
+        }
+        if (netted && abilityPressed) {
+          session.sendStruggle();
         }
         if (!world.loadout.held) {
           for (const spot of tideOrbSpots) {
@@ -921,11 +1048,12 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     stepTurtleAnimation(rivalAnimation, rivalTurtle.visual, rivalTurtle.flippers, canDrive(race.phase) ? rival.speed : 0, dt, false);
     const showOnlineFx = online && !endingFrame && (onlinePhase === "countdown" || onlinePhase === "racing");
     mobs.sync(world.seagulls, clock);
-    netters.sync(world.nets, clock, !online && !endingFrame);
-    ui.netStatus.hidden = online || !!endingFrame || race.phase !== "racing" || world.nets.slow.player <= 0;
+    const netRace = online ? onlinePhase === "racing" : race.phase === "racing";
+    netters.sync(world.nets, clock, !endingFrame);
+    ui.netStatus.hidden = !!endingFrame || !netRace || world.nets.slow.player <= 0;
     // Keep the live-region text stable; updating the timer every frame causes repeated announcements.
     const netSeconds = Math.ceil(world.nets.slow.player);
-    const netLabel = `Caught in a net · ${netSeconds}s · Keep crawling!`;
+    const netLabel = `Caught in a net · ${netSeconds}s · Mash X or RT to get free faster!`;
     if (ui.netStatus.textContent !== netLabel) ui.netStatus.textContent = netLabel;
     fx.sync({
       time: clock,
@@ -944,7 +1072,10 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
       rivalSkin: rivalTurtle.skin,
       rivalShell: rivalTurtle.shell,
       bubbles: endingFrame ? [] : world.bubbles,
-      traps: endingFrame ? [] : trapMarkers(world, rival.x, rival.z),
+      traps: endingFrame ? [] : [
+        ...trapMarkers(world, rival.x, rival.z),
+        ...(world.loadout.effects.bubbleRemaining > 0 ? [{ x: motion.x, y: 0.55, z: motion.z }] : []),
+      ],
     });
 
     const standing = online
@@ -958,14 +1089,13 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
       effects: world.loadout.effects,
     });
     syncAbilityHud(ui, abilityView);
-    syncHealthHud(ui, world, turtleType, hurtFlash > 0);
-    syncRaceUi(ui, race, hudVisible, standing, endingFrame?.phase ?? null);
-    const aiming = race.phase === "racing" && endingFrame === null;
-    ui.crosshair.hidden = !aiming;
-    ui.crosshair.dataset.ready = String(world.bubbleCooldown <= 0);
-    ui.hud.textContent = formatHud({
     syncHealthHud(ui, world, turtleType, hurtFlash > 0, online);
     syncRaceUi(ui, race, hudVisible, standing, endingFrame?.phase ?? null, online);
+    const bubbleArmed = world.loadout.effects.bubbleGunRemaining > 0 && world.loadout.effects.bubbleShotsLeft > 0;
+    const aiming = endingFrame === null && bubbleArmed && (online ? onlinePhase === "racing" : race.phase === "racing");
+    ui.crosshair.hidden = !aiming;
+    ui.crosshair.dataset.ready = String(bubbleArmed && world.bubbleCooldown <= 0);
+    ui.crosshair.setAttribute("aria-label", bubbleArmed ? `${world.loadout.effects.bubbleShotsLeft} bubble shots` : "");
     const readout = formatHud({
       phase: race.phase,
       elapsed: race.elapsed,
@@ -1039,6 +1169,8 @@ function trapMarkers(world: AbilityWorld, rivalX: number, rivalZ: number): { x: 
     }
   }
   return traps;
+}
+
 function loadInputChoice(): InputChoice {
   const params = new URLSearchParams(window.location.search);
   if (params.has("input")) {
@@ -1056,7 +1188,7 @@ function syncAbilityHud(ui: GameUi, view: ReturnType<typeof formatAbilityHud>): 
   ui.abilitySlot.dataset.ready = String(ready);
   ui.abilitySlot.setAttribute(
     "aria-label",
-    view.stored ? (ready ? `${abilityCatalog[view.stored].name}. Press X.` : abilityCatalog[view.stored].name) : "No ability stored",
+    view.stored ? (ready ? `${abilityCatalog[view.stored].name}. Press X or RT.` : abilityCatalog[view.stored].name) : "No ability stored",
   );
   ui.abilityIcon.innerHTML = view.stored ? abilityIcon(view.stored) : "";
   ui.abilityTimer.hidden = view.timer === null;
@@ -1080,7 +1212,7 @@ function syncRaceUi(
   ui.hud.hidden = menuOpen || cinematic || !hudVisible;
   ui.hudToggle.hidden = menuOpen || cinematic;
   ui.abilityHud.hidden = menuOpen || cinematic || (onlineMode && race.phase !== "racing");
-  ui.healthHud.hidden = menuOpen || cinematic || onlineMode;
+  ui.healthHud.hidden = menuOpen || cinematic;
   ui.startScreen.hidden = onlineMode || race.phase !== "ready";
   ui.lobbyBar.hidden = !onlineMode;
   ui.results.hidden = race.phase !== "finished" || cinematic;
@@ -1130,10 +1262,17 @@ function applyServerLoadout(loadout: AbilityLoadout, message: LoadoutMessage, se
   effects.sprayRemaining = message.active === "sand-spray" ? remaining : 0;
   effects.waveWindowRemaining = message.active === "wave-rider" ? remaining : 0;
   effects.trailRemaining = message.active === "magnetic-sense" ? remaining : 0;
+  if (message.active === "bubble-shot" && remaining > 0) {
+    effects.bubbleGunRemaining = remaining;
+    if (loadout.effects.bubbleGunRemaining <= 0) {
+      effects.bubbleShotsLeft = bubbleShotRules.shots;
+    }
+  } else {
+    effects.bubbleGunRemaining = 0;
+    effects.bubbleShotsLeft = 0;
+  }
   effects.slowRemaining = message.slowUntil > serverNow ? (message.slowUntil - serverNow) / 1000 : 0;
-  effects.spinRemaining = 0;
-  effects.stunRemaining = 0;
-  return { held: message.held, spare: null, effects };
+  return { held: message.held, spare: loadout.spare, effects };
 }
 
 function showServerAbility(loadout: AbilityLoadout, ability: AbilityId, remaining: number): AbilityLoadout {
@@ -1145,9 +1284,11 @@ function showServerAbility(loadout: AbilityLoadout, ability: AbilityId, remainin
   effects.sprayRemaining = ability === "sand-spray" ? seconds : 0;
   effects.waveWindowRemaining = ability === "wave-rider" ? seconds : 0;
   effects.trailRemaining = ability === "magnetic-sense" ? seconds : 0;
-  effects.spinRemaining = 0;
-  effects.stunRemaining = 0;
-  return { held: null, spare: null, effects };
+  effects.bubbleGunRemaining = ability === "bubble-shot" ? seconds : 0;
+  effects.bubbleShotsLeft = ability === "bubble-shot" && seconds > 0
+    ? (loadout.effects.bubbleGunRemaining > 0 ? loadout.effects.bubbleShotsLeft : bubbleShotRules.shots)
+    : 0;
+  return { held: null, spare: loadout.spare, effects };
 }
 
 function cueForAbility(ability: AbilityId): AbilityCue {
@@ -1162,6 +1303,9 @@ function cueForAbility(ability: AbilityId): AbilityCue {
   }
   if (ability === "wave-rider") {
     return "wave-arm";
+  }
+  if (ability === "bubble-shot") {
+    return "bubble";
   }
   return "trail";
 }
@@ -1179,8 +1323,12 @@ function syncHealthHud(
   ui.healthHud.dataset.tone = player.tone;
   ui.healthHud.dataset.hurt = String(hurt);
   const rival = formatHealth(world.rivalHealth, "Rival");
+  ui.rivalHealthLabel.hidden = onlineMode;
   ui.rivalHealthLabel.textContent = rival.label;
   ui.rivalHealthFill.style.width = `${rival.fraction * 100}%`;
+  if (ui.rivalHealthFill.parentElement) {
+    ui.rivalHealthFill.parentElement.hidden = onlineMode;
+  }
 
   ui.abilitySpare.hidden = onlineMode || type.itemSlots < 2;
   const spare = onlineMode ? null : world.loadout.spare;
@@ -1188,8 +1336,8 @@ function syncHealthHud(
   ui.abilitySpare.setAttribute("aria-label", spare ? `Next: ${abilityCatalog[spare].name}` : "Second slot empty");
   ui.abilitySpareIcon.innerHTML = spare ? abilityIcon(spare) : "";
 
-  ui.snapHud.hidden = onlineMode || type.special === null;
-  if (!onlineMode && type.special) {
+  ui.snapHud.hidden = type.special === null;
+  if (type.special) {
     const special = formatSpecial({
       kind: type.special,
       snap: world.snap,

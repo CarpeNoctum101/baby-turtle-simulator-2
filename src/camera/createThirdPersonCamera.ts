@@ -79,6 +79,20 @@ export function updateFollowCamera(rig: FollowCameraRig, look: LookOffsets, x: n
   rig.camera.inertialPanningY = 0;
 }
 
+/**
+ * Direction through the center of the screen.
+ * Same yaw and pitch as the follow camera: from the camera, through the turtle, and onward.
+ */
+export function aimThroughCrosshair(look: LookOffsets): { x: number; y: number; z: number } {
+  const alpha = restAlpha + look.yaw;
+  const beta = clamp(restBeta + look.pitch, minBeta, maxBeta);
+  const x = -Math.cos(alpha) * Math.sin(beta);
+  const y = -Math.cos(beta);
+  const z = -Math.sin(alpha) * Math.sin(beta);
+  const length = Math.hypot(x, y, z) || 1;
+  return { x: x / length, y: y / length, z: z / length };
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }

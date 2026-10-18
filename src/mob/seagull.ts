@@ -49,8 +49,8 @@ export const seagullRules = {
   returnSpeed: 6,
   /** Seconds the gull ignores the player after a rescue. */
   graceAfterRescue: 6,
-  /** Share of max health the turtle gets back when it is set down. */
-  restoreFraction: 0.4,
+  /** The turtle is set down at full health after a rescue. */
+  restoreFraction: 1,
   /** The carry never goes further back than this. */
   nestLimitZ: -30,
 } as const;

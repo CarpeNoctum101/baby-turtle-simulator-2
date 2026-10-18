@@ -1,4 +1,5 @@
 import type { AbilityId } from "../src/abilities/catalog";
+import type { BeachHazards } from "./beachHazards";
 import { tideOrbSpots } from "../src/abilities/pickups";
 import { clampToBeach, clampToCourse, course } from "../src/movement/course";
 import type { PublicPlayer, RoomPhase, Ticket } from "./protocol";
@@ -61,6 +62,8 @@ export interface RoomState {
   raceStartedAt: number | null;
   orbs: OrbState[];
   players: PlayerRecord[];
+  /** Shared nets, seagulls and bubbles. Absent in older rows until the room writes them. */
+  hazards?: BeachHazards;
 }
 
 export function freshOrbs(): OrbState[] {

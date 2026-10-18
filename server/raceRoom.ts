@@ -1,6 +1,17 @@
 import { DurableObject } from "cloudflare:workers";
 import { abilityCatalog, type AbilityId } from "../src/abilities/catalog";
 import {
+  armBubbleGun,
+  createBeachHazards,
+  fireBubble,
+  rememberBody,
+  stepBeach,
+  struggleBeach,
+  worldView,
+  type BeachHazards,
+  type BeachPlayer,
+} from "../shared/beachHazards";
+import {
   activateAbility,
   advanceRace,
   claimFinish,
@@ -173,6 +184,18 @@ export class RaceRoom extends DurableObject<Env> {
       await this.#reset(attachment.playerId);
       return;
     }
+    if (message.type === "shot") {
+      await this.#shot(attachment.playerId, message);
+      return;
+    }
+    if (message.type === "struggle") {
+      await this.#struggle(attachment.playerId);
+      return;
+    }
+    if (message.type === "body") {
+      await this.#body(attachment.playerId, message.maxHealth);
+      return;
+    }
     if (message.type === "leave") {
       await this.#leave(ws, attachment.playerId);
     }
@@ -223,12 +246,16 @@ export class RaceRoom extends DurableObject<Env> {
         }
         return;
       }
-      const advanced = advanceRace(state, now).state;
-      if (advanced === state) {
+      let advanced = advanceRace(state, now).state;
+      if (state.phase !== "racing" && advanced.phase === "racing") {
+        advanced = { ...advanced, hazards: createBeachHazards(now) };
+      }
+      const beach = rollBeach(advanced, now);
+      if (!beach.stepped && advanced === state) {
         await this.#schedule(state);
         return;
       }
-      await this.#commit(state, advanced, now, true);
+      await this.#commit(state, beach.state, now, true);
     });
   }
 
@@ -278,6 +305,7 @@ export class RaceRoom extends DurableObject<Env> {
         this.#send(ws, loadoutMessage(racer));
       }
       this.#broadcast(rosterMessage(connected), ws);
+      this.#broadcast(worldMessage(connected, now));
       if (state && connected.phase !== state.phase) {
         this.#broadcast(phaseMessage(connected, now, false), ws);
       }
@@ -295,8 +323,14 @@ export class RaceRoom extends DurableObject<Env> {
         return;
       }
       const now = Date.now();
-      const advanced = advanceRace(state, now).state;
-      const result = applyPose(advanced, playerId, pose, now);
+      let advanced = advanceRace(state, now).state;
+      if (state.phase !== "racing" && advanced.phase === "racing") {
+        advanced = { ...advanced, hazards: createBeachHazards(now) };
+      }
+      const carried = beachOf(advanced, now).racers.some((racer) => racer.id === playerId && racer.lift > 0);
+      const result = carried
+        ? { ok: true as const, state: advanced, pose: poseOfPlayer(advanced, playerId) }
+        : applyPose(advanced, playerId, pose, now);
       if (!result.ok) {
         if (advanced !== state) {
           await this.#commit(state, advanced, now, true);
@@ -307,12 +341,17 @@ export class RaceRoom extends DurableObject<Env> {
         }
         return;
       }
-      await this.#persist(result.state);
+      const beach = rollBeach(result.state, now);
+      await this.#persist(beach.state);
       if (advanced.phase !== state.phase || advanced.raceStartedAt !== state.raceStartedAt) {
-        this.#broadcast(phaseMessage(result.state, now, false));
-        this.#broadcast(rosterMessage(result.state));
+        this.#broadcast(phaseMessage(beach.state, now, false));
+        this.#broadcast(rosterMessage(beach.state));
       }
-      this.#broadcast({ type: "pose", playerId, ...result.pose }, ws);
+      const shown = poseOfPlayer(beach.state, playerId) ?? result.pose ?? pose;
+      this.#broadcast({ type: "pose", playerId, ...shown }, ws);
+      if (beach.stepped) {
+        this.#broadcast(worldMessage(beach.state, now));
+      }
     });
   }
 
@@ -364,6 +403,11 @@ export class RaceRoom extends DurableObject<Env> {
       if (!result.ok) {
         return { state, failure: result };
       }
+      let next = result.state;
+      if (ability === "bubble-shot") {
+        const synced = stepBeach(beachOf(next, now), beachPlayers(next, now), now).hazards;
+        next = { ...next, hazards: armBubbleGun(synced, playerId, result.activation.until, now) };
+      }
       const extra: Notice[] = [{ message: { type: "ability", playerId, ...result.activation } }];
       const touched = new Set([playerId, ...result.activation.slowed, ...result.activation.blocked]);
       for (const id of touched) {
@@ -372,7 +416,53 @@ export class RaceRoom extends DurableObject<Env> {
           extra.push({ message: loadoutMessage(player), to: player.id });
         }
       }
-      return { state: result.state, extra };
+      return { state: next, extra };
+    });
+  }
+
+  async #shot(
+    playerId: string,
+    shot: { x: number; y: number; z: number; dirX: number; dirY: number; dirZ: number },
+  ): Promise<void> {
+    await this.#exclusive(async () => {
+      const state = this.#read();
+      if (!state || state.phase !== "racing") {
+        return;
+      }
+      const now = Date.now();
+      const fired = fireBubble(
+        beachOf(state, now),
+        playerId,
+        { x: shot.x, y: shot.y, z: shot.z },
+        { x: shot.dirX, y: shot.dirY, z: shot.dirZ },
+        now,
+      );
+      if (!fired.ok) {
+        return;
+      }
+      await this.#commit(state, { ...state, hazards: fired.hazards }, now, false);
+    });
+  }
+
+  async #struggle(playerId: string): Promise<void> {
+    await this.#exclusive(async () => {
+      const state = this.#read();
+      if (!state || state.phase !== "racing") {
+        return;
+      }
+      const now = Date.now();
+      await this.#commit(state, { ...state, hazards: struggleBeach(beachOf(state, now), playerId) }, now, false);
+    });
+  }
+
+  async #body(playerId: string, maxHealth: number): Promise<void> {
+    await this.#exclusive(async () => {
+      const state = this.#read();
+      if (!state) {
+        return;
+      }
+      const now = Date.now();
+      await this.#commit(state, { ...state, hazards: rememberBody(beachOf(state, now), playerId, maxHealth) }, now, false);
     });
   }
 
@@ -397,7 +487,7 @@ export class RaceRoom extends DurableObject<Env> {
         return { state, failure: result };
       }
       return {
-        state: result.state,
+        state: { ...result.state, hazards: createBeachHazards(now) },
         roster: true,
         extra: [
           { message: { type: "orbs", orbs: result.state.orbs } },
@@ -497,6 +587,9 @@ export class RaceRoom extends DurableObject<Env> {
       return;
     }
     await this.#persist(next);
+    if (next.hazards && next.hazards !== previous.hazards) {
+      this.#broadcast(worldMessage(next, now));
+    }
     if (previous.phase !== next.phase || previous.countdownEndsAt !== next.countdownEndsAt || previous.raceStartedAt !== next.raceStartedAt) {
       const snap = (previous.phase === "lobby" && next.phase === "countdown") || (previous.phase === "finished" && next.phase === "lobby");
       this.#broadcast(phaseMessage(next, now, snap));
@@ -545,6 +638,7 @@ export class RaceRoom extends DurableObject<Env> {
     this.#column("room", "countdown_ends_at", "INTEGER");
     this.#column("room", "race_started_at", "INTEGER");
     this.#column("room", "orbs", "TEXT NOT NULL DEFAULT '[]'");
+    this.#column("room", "hazards", "TEXT");
     this.#column("players", "ready", "INTEGER NOT NULL DEFAULT 0");
     this.#column("players", "held", "TEXT");
     this.#column("players", "active", "TEXT");
@@ -565,7 +659,7 @@ export class RaceRoom extends DurableObject<Env> {
 
   #read(): RoomState | null {
     const rows = this.ctx.storage.sql
-      .exec("SELECT code, phase, created_at, empty_since, host_id, countdown_ends_at, race_started_at, orbs FROM room WHERE id = 1")
+      .exec("SELECT code, phase, created_at, empty_since, host_id, countdown_ends_at, race_started_at, orbs, hazards FROM room WHERE id = 1")
       .toArray();
     const room = rows[0];
     if (!room) {
@@ -607,14 +701,15 @@ export class RaceRoom extends DurableObject<Env> {
         place: num(player.place),
         lastActionAt: num(player.last_action_at),
       })),
+      hazards: parseHazards(room.hazards, num(room.created_at)),
     };
   }
 
   async #persist(state: RoomState): Promise<void> {
     this.ctx.storage.transactionSync(() => {
       this.ctx.storage.sql.exec(
-        `INSERT INTO room (id, code, phase, created_at, empty_since, host_id, countdown_ends_at, race_started_at, orbs)
-         VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO room (id, code, phase, created_at, empty_since, host_id, countdown_ends_at, race_started_at, orbs, hazards)
+         VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            code = excluded.code,
            phase = excluded.phase,
@@ -623,7 +718,8 @@ export class RaceRoom extends DurableObject<Env> {
            host_id = excluded.host_id,
            countdown_ends_at = excluded.countdown_ends_at,
            race_started_at = excluded.race_started_at,
-           orbs = excluded.orbs`,
+           orbs = excluded.orbs,
+           hazards = excluded.hazards`,
         state.code,
         state.phase,
         state.createdAt,
@@ -632,6 +728,7 @@ export class RaceRoom extends DurableObject<Env> {
         state.countdownEndsAt,
         state.raceStartedAt,
         JSON.stringify(state.orbs),
+        JSON.stringify(state.hazards ?? createBeachHazards(state.createdAt)),
       );
       this.ctx.storage.sql.exec("DELETE FROM players");
       for (const player of state.players) {
@@ -666,11 +763,13 @@ export class RaceRoom extends DurableObject<Env> {
 
   async #schedule(state: RoomState): Promise<void> {
     const wake = nextWake(state);
-    if (wake === null) {
+    const soon = state.phase === "racing" ? Date.now() + 100 : null;
+    const when = wake === null ? soon : soon === null ? wake : Math.min(wake, soon);
+    if (when === null) {
       await this.ctx.storage.deleteAlarm();
       return;
     }
-    await this.ctx.storage.setAlarm(wake);
+    await this.ctx.storage.setAlarm(when);
   }
 
   #send(ws: WebSocket, message: ServerMessage): void {
@@ -687,6 +786,75 @@ export class RaceRoom extends DurableObject<Env> {
         this.#send(socket, message);
       }
     }
+  }
+}
+
+function beachOf(state: RoomState, now: number): BeachHazards {
+  return state.hazards ?? createBeachHazards(now);
+}
+
+function beachPlayers(state: RoomState, now: number): BeachPlayer[] {
+  return state.players.map((player) => ({
+    id: player.id,
+    x: player.x,
+    z: player.z,
+    heading: player.heading,
+    speed: player.speed,
+    connected: player.connected,
+    place: player.place,
+    guard: player.active === "shell-guard" && player.activeUntil > now,
+  }));
+}
+
+function rollBeach(state: RoomState, now: number): { state: RoomState; stepped: boolean } {
+  if (state.phase !== "racing") {
+    return { state, stepped: false };
+  }
+  const before = beachOf(state, now);
+  const result = stepBeach(before, beachPlayers(state, now), now);
+  const stepped = result.hazards.steppedAt !== before.steppedAt || result.cleared.length > 0 || result.poses.length > 0;
+  if (!stepped) {
+    return { state, stepped: false };
+  }
+  const players = state.players.map((player) => {
+    const pose = result.poses.find((item) => item.id === player.id);
+    let next = pose ? { ...player, x: pose.x, z: pose.z, speed: 0 } : player;
+    if (result.cleared.includes(player.id)) {
+      next = { ...next, active: null, activeUntil: 0 };
+    }
+    return next;
+  });
+  return { state: { ...state, players, hazards: result.hazards }, stepped: true };
+}
+
+function poseOfPlayer(state: RoomState, playerId: string): { x: number; z: number; heading: number; speed: number } | null {
+  const player = state.players.find((entry) => entry.id === playerId);
+  if (!player) {
+    return null;
+  }
+  return { x: player.x, z: player.z, heading: player.heading, speed: player.speed };
+}
+
+function worldMessage(state: RoomState, now: number): ServerMessage {
+  return { type: "world", ...worldView(beachOf(state, now), now) };
+}
+
+function parseHazards(value: unknown, now: number): BeachHazards {
+  if (typeof value !== "string" || value.length === 0) {
+    return createBeachHazards(now);
+  }
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!parsed || typeof parsed !== "object") {
+      return createBeachHazards(now);
+    }
+    const hazards = parsed as BeachHazards;
+    if (!Array.isArray(hazards.seagulls) || !Array.isArray(hazards.nets) || !Array.isArray(hazards.bubbles) || !Array.isArray(hazards.racers)) {
+      return createBeachHazards(now);
+    }
+    return hazards;
+  } catch {
+    return createBeachHazards(now);
   }
 }
 

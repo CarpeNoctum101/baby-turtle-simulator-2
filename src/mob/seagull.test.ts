@@ -139,7 +139,7 @@ describe("seagull in the world", () => {
     expect(hit.world.seagulls[0]!.phase).toBe("recover");
   });
 
-  it("carries a turtle at zero health back toward the nest, then sets it down with some health", () => {
+  it("carries a turtle at zero health back toward the nest, then sets it down at full health", () => {
     let world = createAbilityWorld(100, spawns);
     world = { ...world, playerHealth: { current: 0, max: 100 } };
     const start = { ...createTurtleMotion(), x: 3, z: 12 };
@@ -158,7 +158,7 @@ describe("seagull in the world", () => {
     expect(finished).toBe(true);
     expect(peak).toBeGreaterThan(1.5);
     expect(start.z - player.z).toBeGreaterThan(15);
-    expect(world.playerHealth.current).toBe(Math.ceil(100 * seagullRules.restoreFraction));
+    expect(world.playerHealth.current).toBe(world.playerHealth.max);
     expect(world.seagulls[0]!.grace).toBeGreaterThan(0);
   });
 

@@ -153,4 +153,18 @@ describe("ability world", () => {
     expect(isTrailVisible(faded.world.loadout.effects)).toBe(false);
     expect(isTrailVisible(createAbilityWorld().loadout.effects)).toBe(false);
   });
+
+  it("leaves Tide Orbs to the server during an online race", () => {
+    const spot = tideOrbSpots[0];
+    if (!spot) {
+      throw new Error("expected an orb");
+    }
+    const stepped = tick(createAbilityWorld(), {
+      player: { ...createTurtleMotion(), x: spot.x, z: spot.z },
+      activate: true,
+      serverItems: true,
+    });
+    expect(stepped.world.loadout.held).toBeNull();
+    expect(stepped.cues).not.toContain("pickup");
+  });
 });

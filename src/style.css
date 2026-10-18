@@ -408,6 +408,10 @@ body {
   background: #8fd0ea;
 }
 
+#abilityHud[data-tone="bubble"] #abilityMeterFill {
+  background: #7ec8e3;
+}
+
 #abilityHud[data-tone="trail"] #abilityMeterFill {
   background: #d7c4ff;
 }

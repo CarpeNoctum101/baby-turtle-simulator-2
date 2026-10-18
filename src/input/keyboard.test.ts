@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readKeyboard } from "./keyboard";
+import { isTypingTarget, readKeyboard } from "./keyboard";
 
 describe("readKeyboard", () => {
   it("maps WASD to throttle and steer", () => {
@@ -18,5 +18,13 @@ describe("readKeyboard", () => {
 
   it("uses Space as the brake", () => {
     expect(readKeyboard(new Set(["Space"])).brake).toBe(true);
+  });
+
+  it("lets a room code field receive WASD instead of treating them as driving keys", () => {
+    expect(isTypingTarget({ tagName: "INPUT" })).toBe(true);
+    expect(isTypingTarget({ tagName: "TEXTAREA" })).toBe(true);
+    expect(isTypingTarget({ tagName: "DIV", isContentEditable: true })).toBe(true);
+    expect(isTypingTarget({ tagName: "CANVAS" })).toBe(false);
+    expect(isTypingTarget(null)).toBe(false);
   });
 });

@@ -1,9 +1,9 @@
 import { clampDt } from "./clock";
-import { overlapsObstacle } from "../movement/obstacles";
+import { obstacleTop } from "../movement/obstacles";
 
 /**
- * A bubble fired along the camera's ground direction.
- * It travels flat across the sand and pops on the first turtle, seagull, or solid obstacle it meets.
+ * A bubble fired along the camera's look direction, through the center of the screen.
+ * It travels in three dimensions and pops on the first turtle, seagull, rock, log, or the sand.
  * A hit holds that racer in place. The shooter is never a target.
  */
 export const bubbleRules = {
@@ -11,18 +11,22 @@ export const bubbleRules = {
   radius: 0.42,
   /** How far in front of the shell the bubble appears, so it does not spawn inside the shooter. */
   spawnForward: 0.9,
+  /** Shell height. The shot starts here, then steps along the aim. */
+  spawnHeight: 0.55,
   maxAge: 1.15,
   trapSeconds: 2.4,
   cooldown: 0.55,
   hitRadius: 0.9,
-  /** Circling gulls cruise under this, so a flat shot can still catch them. */
-  maxTargetHeight: 6.5,
+  /** At or below this height the bubble has met the sand. */
+  groundY: 0.05,
 } as const;
 
 export interface BubbleShot {
   x: number;
+  y: number;
   z: number;
   dirX: number;
+  dirY: number;
   dirZ: number;
   age: number;
 }
@@ -34,17 +38,27 @@ export interface BubbleTarget {
   y: number;
 }
 
-export function launchBubble(x: number, z: number, dirX: number, dirZ: number): BubbleShot | null {
-  const length = Math.hypot(dirX, dirZ);
+export function launchBubble(
+  x: number,
+  y: number,
+  z: number,
+  dirX: number,
+  dirY: number,
+  dirZ: number,
+): BubbleShot | null {
+  const length = Math.hypot(dirX, dirY, dirZ);
   if (length < 0.001) {
     return null;
   }
   const nx = dirX / length;
+  const ny = dirY / length;
   const nz = dirZ / length;
   return {
     x: x + nx * bubbleRules.spawnForward,
+    y: Math.max(bubbleRules.groundY, y + ny * bubbleRules.spawnForward),
     z: z + nz * bubbleRules.spawnForward,
     dirX: nx,
+    dirY: ny,
     dirZ: nz,
     age: 0,
   };
@@ -61,8 +75,10 @@ export function stepBubbleShots(shots: readonly BubbleShot[], dt: number): Bubbl
     }
     next.push({
       x: shot.x + shot.dirX * bubbleRules.speed * step,
+      y: shot.y + shot.dirY * bubbleRules.speed * step,
       z: shot.z + shot.dirZ * bubbleRules.speed * step,
       dirX: shot.dirX,
+      dirY: shot.dirY,
       dirZ: shot.dirZ,
       age,
     });
@@ -71,8 +87,8 @@ export function stepBubbleShots(shots: readonly BubbleShot[], dt: number): Bubbl
 }
 
 /**
- * Each bubble stops on the nearest target in range, or on a rock or log.
- * A target can only be caught once per frame.
+ * Each bubble stops on the nearest target in range, or on the sand, a rock, or a log.
+ * A target can only be caught once per frame. A bubble above an obstacle flies over it.
  */
 export function consumeBubbleHits(
   shots: readonly BubbleShot[],
@@ -81,16 +97,16 @@ export function consumeBubbleHits(
   const hits: string[] = [];
   const left: BubbleShot[] = [];
   for (const shot of shots) {
-    if (overlapsObstacle(shot.x, shot.z, bubbleRules.radius)) {
+    if (shot.y <= bubbleRules.groundY || shot.y <= obstacleTop(shot.x, shot.z, bubbleRules.radius)) {
       continue;
     }
     let closest: BubbleTarget | null = null;
     let closestDist = Number.POSITIVE_INFINITY;
     for (const target of targets) {
-      if (target.y > bubbleRules.maxTargetHeight || hits.includes(target.id)) {
+      if (hits.includes(target.id)) {
         continue;
       }
-      const dist = Math.hypot(shot.x - target.x, shot.z - target.z);
+      const dist = Math.hypot(shot.x - target.x, shot.y - target.y, shot.z - target.z);
       if (dist <= bubbleRules.hitRadius && dist < closestDist) {
         closest = target;
         closestDist = dist;

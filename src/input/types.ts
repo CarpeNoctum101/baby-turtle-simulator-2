@@ -29,11 +29,11 @@ export interface StickMapping {
   lookYAxis: number;
   /** Null when this layout does not assign a brake button. */
   brakeButton: number | null;
-  /** Null when this layout does not assign the ability button. Standard pads use X. */
+  /** Null when this layout does not assign the ability button. Standard pads use RT. */
   abilityButton: number | null;
   /** Null when this layout does not assign the snap button. Standard pads use Y. */
   snapButton: number | null;
-  /** Null when this layout does not assign the bubble button. Standard pads use RT. */
+  /** Null when this layout does not assign the bubble button. Standard pads use RT, the same button as abilities. */
   shootButton: number | null;
   /** Standard pads report "stick up" as a negative number. */
   invertThrottle: boolean;

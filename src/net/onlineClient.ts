@@ -48,6 +48,7 @@ export interface OnlineEvents {
   onLoadout?: (message: Extract<ServerMessage, { type: "loadout" }>) => void;
   onAbility?: (message: Extract<ServerMessage, { type: "ability" }>) => void;
   onFinish?: (message: Extract<ServerMessage, { type: "finish" }>) => void;
+  onWorld?: (message: Extract<ServerMessage, { type: "world" }>) => void;
   onRejectedAction?: (message: Extract<ServerMessage, { type: "rejected" }>) => void;
   onError: (message: string) => void;
   onClose: () => void;
@@ -122,6 +123,10 @@ export class OnlineSession {
         this.events.onFinish?.(message);
         return;
       }
+      if (message.type === "world") {
+        this.events.onWorld?.(message);
+        return;
+      }
       if (message.type === "rejected") {
         this.events.onRejectedAction?.(message);
         return;
@@ -161,6 +166,18 @@ export class OnlineSession {
 
   sendAbility(ability: AbilityId): void {
     this.send({ type: "ability", ability });
+  }
+
+  sendShot(x: number, y: number, z: number, dirX: number, dirY: number, dirZ: number): void {
+    this.send({ type: "shot", x, y, z, dirX, dirY, dirZ });
+  }
+
+  sendStruggle(): void {
+    this.send({ type: "struggle" });
+  }
+
+  sendBody(maxHealth: number): void {
+    this.send({ type: "body", maxHealth });
   }
 
   sendFinish(): void {

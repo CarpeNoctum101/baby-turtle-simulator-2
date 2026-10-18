@@ -54,20 +54,20 @@ describe("readGamepadSnapshot", () => {
     expect(reading.pressedButtons.map((button) => button.index)).toEqual([1]);
   });
 
-  it("uses RT as the bubble button on a standard pad only", () => {
+  it("uses RT for both the ability and the bubble on a standard pad only", () => {
     const xbox = readGamepadSnapshot(snapshot({ buttons: buttons([7]) }), 0.18);
     const unknown = readGamepadSnapshot(snapshot({ mapping: "", buttons: buttons([7]) }), 0.18);
     expect(xbox.shoot).toBe(true);
-    expect(xbox.ability).toBe(false);
+    expect(xbox.ability).toBe(true);
     expect(unknown.shoot).toBe(false);
+    expect(unknown.ability).toBe(false);
   });
 
-  it("uses the X button as the ability on a standard pad only", () => {
+  it("does not use the X button as the ability", () => {
     const xbox = readGamepadSnapshot(snapshot({ buttons: buttons([2]) }), 0.18);
-    const unknown = readGamepadSnapshot(snapshot({ mapping: "", buttons: buttons([2]) }), 0.18);
-    expect(xbox.ability).toBe(true);
+    expect(xbox.ability).toBe(false);
+    expect(xbox.shoot).toBe(false);
     expect(xbox.brake).toBe(false);
-    expect(unknown.ability).toBe(false);
   });
 
   it("does not treat the A button as brake on a standard pad", () => {
