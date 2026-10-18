@@ -7,12 +7,19 @@ const hudToggle = document.querySelector<HTMLButtonElement>("#hudToggle");
 const startScreen = document.querySelector<HTMLElement>("#startScreen");
 const homeStep = document.querySelector<HTMLElement>("#homeStep");
 const modeStep = document.querySelector<HTMLElement>("#modeStep");
+const onlineStep = document.querySelector<HTMLElement>("#onlineStep");
+const joinStep = document.querySelector<HTMLElement>("#joinStep");
 const setupStep = document.querySelector<HTMLElement>("#setupStep");
-const joinSetup = document.querySelector<HTMLElement>("#joinSetup");
+const lobbySetup = document.querySelector<HTMLElement>("#lobbySetup");
+const roomCodeBlock = document.querySelector<HTMLElement>("#roomCodeBlock");
+const roomCodeLabel = document.querySelector<HTMLElement>("#roomCodeLabel");
 const playButton = document.querySelector<HTMLButtonElement>("#playButton");
 const chooseLocalButton = document.querySelector<HTMLButtonElement>("#chooseLocal");
 const chooseOnlineButton = document.querySelector<HTMLButtonElement>("#chooseOnline");
+const openJoinButton = document.querySelector<HTMLButtonElement>("#openJoin");
 const backToHomeButton = document.querySelector<HTMLButtonElement>("#backToHome");
+const backFromOnlineButton = document.querySelector<HTMLButtonElement>("#backFromOnline");
+const backFromJoinButton = document.querySelector<HTMLButtonElement>("#backFromJoin");
 const backToModeButton = document.querySelector<HTMLButtonElement>("#backToMode");
 const startButton = document.querySelector<HTMLButtonElement>("#startRace");
 const countdown = document.querySelector<HTMLElement>("#countdown");
@@ -33,6 +40,8 @@ const playerName = document.querySelector<HTMLInputElement>("#playerName");
 const createRoomButton = document.querySelector<HTMLButtonElement>("#createRoom");
 const roomCodeInput = document.querySelector<HTMLInputElement>("#roomCode");
 const joinRoomButton = document.querySelector<HTMLButtonElement>("#joinRoom");
+const gateStatus = document.querySelector<HTMLElement>("#gateStatus");
+const joinStatus = document.querySelector<HTMLElement>("#joinStatus");
 const onlineStatus = document.querySelector<HTMLElement>("#onlineStatus");
 const lobbyBar = document.querySelector<HTMLElement>("#lobbyBar");
 const lobbySummary = document.querySelector<HTMLElement>("#lobbySummary");
@@ -66,12 +75,19 @@ const ui: GameUi | null =
   startScreen &&
   homeStep &&
   modeStep &&
+  onlineStep &&
+  joinStep &&
   setupStep &&
-  joinSetup &&
+  lobbySetup &&
+  roomCodeBlock &&
+  roomCodeLabel &&
   playButton &&
   chooseLocalButton &&
   chooseOnlineButton &&
+  openJoinButton &&
   backToHomeButton &&
+  backFromOnlineButton &&
+  backFromJoinButton &&
   backToModeButton &&
   startButton &&
   countdown &&
@@ -92,6 +108,8 @@ const ui: GameUi | null =
   createRoomButton &&
   roomCodeInput &&
   joinRoomButton &&
+  gateStatus &&
+  joinStatus &&
   onlineStatus &&
   lobbyBar &&
   lobbySummary &&
@@ -120,12 +138,19 @@ const ui: GameUi | null =
         startScreen,
         homeStep,
         modeStep,
+        onlineStep,
+        joinStep,
         setupStep,
-        joinSetup,
+        lobbySetup,
+        roomCodeBlock,
+        roomCodeLabel,
         playButton,
         chooseLocalButton,
         chooseOnlineButton,
+        openJoinButton,
         backToHomeButton,
+        backFromOnlineButton,
+        backFromJoinButton,
         backToModeButton,
         startButton,
         countdown,
@@ -146,6 +171,8 @@ const ui: GameUi | null =
         createRoomButton,
         roomCodeInput,
         joinRoomButton,
+        gateStatus,
+        joinStatus,
         onlineStatus,
         lobbyBar,
         lobbySummary,

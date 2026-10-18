@@ -63,12 +63,19 @@ export interface GameUi {
   startScreen: HTMLElement;
   homeStep: HTMLElement;
   modeStep: HTMLElement;
+  onlineStep: HTMLElement;
+  joinStep: HTMLElement;
   setupStep: HTMLElement;
-  joinSetup: HTMLElement;
+  lobbySetup: HTMLElement;
+  roomCodeBlock: HTMLElement;
+  roomCodeLabel: HTMLElement;
   playButton: HTMLButtonElement;
   chooseLocalButton: HTMLButtonElement;
   chooseOnlineButton: HTMLButtonElement;
+  openJoinButton: HTMLButtonElement;
   backToHomeButton: HTMLButtonElement;
+  backFromOnlineButton: HTMLButtonElement;
+  backFromJoinButton: HTMLButtonElement;
   backToModeButton: HTMLButtonElement;
   startButton: HTMLButtonElement;
   countdown: HTMLElement;
@@ -89,6 +96,8 @@ export interface GameUi {
   createRoomButton: HTMLButtonElement;
   roomCodeInput: HTMLInputElement;
   joinRoomButton: HTMLButtonElement;
+  gateStatus: HTMLElement;
+  joinStatus: HTMLElement;
   onlineStatus: HTMLElement;
   lobbyBar: HTMLElement;
   lobbySummary: HTMLElement;
@@ -123,6 +132,9 @@ export interface RunningGame {
 
 const idleDrive: DriveInput = { throttle: 0, steer: 0, brake: false };
 const inputChoiceKey = "baby-turtle-input";
+
+/** Front-door pages. Online play is choice, then a code, then the lobby. */
+type MenuStep = "home" | "mode" | "online" | "join" | "setup";
 
 /**
  * Builds the beach once, then runs a single draw loop.
@@ -174,7 +186,7 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
   const rivalAnimation: TurtleAnimation = { phase: 0 };
   let hudVisible = false;
   let settingsOpen = false;
-  let menuStep: "home" | "mode" | "setup" = "home";
+  let menuStep: MenuStep = "home";
   let playPath: "local" | "online" = "local";
   const heldEdges = new Set<string>();
   let online = false;
@@ -255,14 +267,19 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     placeTurtle(rivalTurtle, rival);
     canvas.focus();
   };
-  const showMenu = (step: "home" | "mode" | "setup") => {
+  const showMenu = (step: MenuStep) => {
     menuStep = step;
     ui.startScreen.dataset.step = step;
     ui.homeStep.hidden = step !== "home";
     ui.modeStep.hidden = step !== "mode";
+    ui.onlineStep.hidden = step !== "online";
+    ui.joinStep.hidden = step !== "join";
     ui.setupStep.hidden = step !== "setup";
-    ui.startButton.hidden = playPath !== "local";
-    ui.joinSetup.hidden = playPath !== "online";
+    const localSetup = step === "setup" && playPath === "local";
+    const onlineLobby = step === "setup" && playPath === "online";
+    ui.startButton.hidden = !localSetup;
+    ui.lobbySetup.hidden = !onlineLobby;
+    ui.roomCodeBlock.hidden = !onlineLobby;
   };
   const returnToMenu = () => {
     spaceEnding.reset();
@@ -365,12 +382,14 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     } else {
       ui.lobbySummary.textContent = `Room ${roomCode}. ${connected.length} connected. ${names.join(", ")}. Ready up, then the host starts the countdown.`;
     }
-    if (roomCode) ui.roomCodeInput.value = roomCode;
+    if (roomCode && document.activeElement !== ui.roomCodeInput) ui.roomCodeInput.value = roomCode;
+    ui.roomCodeLabel.textContent = roomCode || "----";
     if (onlinePhase === "lobby" && roomCode) {
       const readyCount = connected.filter((player) => player.ready).length;
+      ui.onlineStatus.dataset.error = "false";
       ui.onlineStatus.textContent = connected.length <= 1
-        ? `Room ${roomCode}. Share the code, then ready up.`
-        : `Room ${roomCode}. ${readyCount} of ${connected.length} ready.`;
+        ? "Share the code, then ready up."
+        : `${readyCount} of ${connected.length} ready.`;
     }
     ui.readyToggle.hidden = onlinePhase !== "lobby";
     ui.readyToggle.textContent = me?.ready ? "Not ready" : "Ready";
@@ -442,7 +461,7 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     }
   };
 
-  const stopOnline = (status: string, forget: boolean) => {
+  const stopOnline = (status: string, forget: boolean, next: MenuStep = "home") => {
     const current = session;
     session = null;
     online = false;
@@ -466,10 +485,16 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     resetCombat();
     placeTurtle(turtle, motion);
     placeTurtle(rivalTurtle, rival);
-    ui.onlineStatus.textContent = status;
     ui.lobbyBar.hidden = true;
     ui.startScreen.hidden = false;
-    showMenu("home");
+    playPath = next === "home" ? "local" : "online";
+    showMenu(next);
+    ui.gateStatus.dataset.error = String(next === "online" && status.length > 0);
+    ui.gateStatus.textContent = next === "online" ? status : "";
+    ui.joinStatus.dataset.error = String(next === "join" && status.length > 0);
+    ui.joinStatus.textContent = next === "join" ? status : "";
+    ui.onlineStatus.dataset.error = "false";
+    ui.onlineStatus.textContent = "";
     ui.rematchButton.disabled = false;
     ui.resultsTitle.textContent = "You reached the sea";
     ui.resultsTable.hidden = true;
@@ -493,7 +518,9 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     ending = null;
     spaceEnding.reset();
     resetCombat();
-    ui.onlineStatus.textContent = `Joining room ${ticket.roomCode}…`;
+    const connecting = menuStep === "join" ? ui.joinStatus : ui.gateStatus;
+    connecting.dataset.error = "false";
+    connecting.textContent = `Joining room ${ticket.roomCode}…`;
     session?.drop();
     session = new OnlineSession({
       onWelcome: (message) => {
@@ -514,9 +541,16 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
         if (me) {
           noteSelfFinish(me.place, me.ms);
         }
-        ui.startScreen.hidden = true;
-        ui.lobbyBar.hidden = false;
         ui.onlineStatus.textContent = "";
+        if (message.phase === "lobby") {
+          playPath = "online";
+          showMenu("setup");
+          ui.startScreen.hidden = false;
+          ui.lobbyBar.hidden = true;
+        } else {
+          ui.startScreen.hidden = true;
+          ui.lobbyBar.hidden = false;
+        }
         renderLobby();
         session?.sendBody(turtleType.maxHealth);
         canvas.focus();
@@ -536,7 +570,7 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
         }
         renderLobby();
         if (message.phase === "closed") {
-          stopOnline("This room was closed because everyone left.", true);
+          stopOnline("This room was closed because everyone left.", true, "online");
         }
       },
       onPhase: (message) => {
@@ -657,25 +691,32 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
         placeTurtle(turtle, motion);
       },
       onError: (message) => {
-        stopOnline(message, true);
+        stopOnline(message, true, "online");
       },
       onClose: () => {
-        stopOnline("The room connection closed. Join again with the same code, or start a local race.", false);
+        stopOnline("The room connection closed. Join again with the same code, or start a local race.", false, "join");
       },
     });
     session.connect(ticket);
   };
 
+  const showConnectError = (text: string) => {
+    const target = menuStep === "join" ? ui.joinStatus : ui.gateStatus;
+    target.dataset.error = "true";
+    target.textContent = text;
+  };
   const runOnlineAction = async (action: () => Promise<void>) => {
     ui.createRoomButton.disabled = true;
     ui.joinRoomButton.disabled = true;
+    ui.openJoinButton.disabled = true;
     try {
       await action();
     } catch (error) {
-      ui.onlineStatus.textContent = error instanceof Error ? error.message : "Could not reach the online lobby.";
+      showConnectError(error instanceof Error ? error.message : "Could not reach the online lobby.");
     } finally {
       ui.createRoomButton.disabled = false;
       ui.joinRoomButton.disabled = false;
+      ui.openJoinButton.disabled = false;
     }
   };
 
@@ -759,22 +800,50 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
   };
   const onChooseOnline = () => {
     playPath = "online";
-    showMenu("setup");
+    ui.gateStatus.textContent = "";
+    ui.gateStatus.dataset.error = "false";
+    showMenu("online");
+  };
+  const onOpenJoin = () => {
+    ui.joinStatus.textContent = "";
+    ui.joinStatus.dataset.error = "false";
+    showMenu("join");
+    ui.roomCodeInput.focus();
   };
   const onBackHome = () => showMenu("home");
+  const onBackFromOnline = () => {
+    playPath = "local";
+    showMenu("mode");
+  };
+  const onBackFromJoin = () => showMenu("online");
   const onBackMode = () => {
     if (online) {
-      stopOnline("", true);
+      stopOnline("", true, "online");
+      return;
     }
     playPath = "local";
     showMenu("mode");
   };
+  const onRoomCodeKey = (event: KeyboardEvent) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      onJoinRoom();
+    }
+  };
   ui.playButton.addEventListener("click", onPlay);
   ui.chooseLocalButton.addEventListener("click", onChooseLocal);
   ui.chooseOnlineButton.addEventListener("click", onChooseOnline);
+  ui.openJoinButton.addEventListener("click", onOpenJoin);
   ui.backToHomeButton.addEventListener("click", onBackHome);
+  ui.backFromOnlineButton.addEventListener("click", onBackFromOnline);
+  ui.backFromJoinButton.addEventListener("click", onBackFromJoin);
   ui.backToModeButton.addEventListener("click", onBackMode);
+  ui.roomCodeInput.addEventListener("keydown", onRoomCodeKey);
   showMenu("home");
+  if (presetRoom) {
+    playPath = "online";
+    showMenu("join");
+  }
 
   const setHudVisible = (visible: boolean) => {
     hudVisible = visible;
@@ -1243,8 +1312,12 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
       ui.playButton.removeEventListener("click", onPlay);
       ui.chooseLocalButton.removeEventListener("click", onChooseLocal);
       ui.chooseOnlineButton.removeEventListener("click", onChooseOnline);
+      ui.openJoinButton.removeEventListener("click", onOpenJoin);
       ui.backToHomeButton.removeEventListener("click", onBackHome);
+      ui.backFromOnlineButton.removeEventListener("click", onBackFromOnline);
+      ui.backFromJoinButton.removeEventListener("click", onBackFromJoin);
       ui.backToModeButton.removeEventListener("click", onBackMode);
+      ui.roomCodeInput.removeEventListener("keydown", onRoomCodeKey);
       ui.startButton.removeEventListener("click", beginFromMenu);
       ui.rematchButton.removeEventListener("click", onRematch);
       ui.createRoomButton.removeEventListener("click", onCreateRoom);
@@ -1318,7 +1391,7 @@ function syncRaceUi(
   endingPhase: EndingPhase | null,
   onlineMode: boolean,
   onlinePhase: RoomPhase | null,
-  menuStep: "home" | "mode" | "setup",
+  menuStep: MenuStep,
 ): void {
   const cinematic = endingPhase !== null && endingPhase !== "space";
   const atFrontDoor = (!onlineMode && race.phase === "ready") || (onlineMode && onlinePhase === "lobby");

@@ -48,22 +48,37 @@
         <p class="eyebrow">Baby Turtle Simulator 2</p>
         <h2>How do you want to race?</h2>
         <button id="chooseLocal" class="primary" type="button">Start a race</button>
-        <button id="chooseOnline" class="primary" type="button">Join a race</button>
+        <button id="chooseOnline" class="primary" type="button">Multiplayer</button>
         <button id="backToHome" class="ghost" type="button">Back</button>
       </div>
+      <div id="onlineStep" class="panel mode-card" hidden>
+        <p class="eyebrow">Multiplayer</p>
+        <h2>Create or join a room</h2>
+        <label class="field">Name <input id="playerName" maxlength="16" value="Hatchling" autocomplete="nickname" /></label>
+        <button id="createRoom" class="primary" type="button">Create room</button>
+        <button id="openJoin" class="primary" type="button">Join room</button>
+        <p id="gateStatus" class="menu-status" role="status"></p>
+        <button id="backFromOnline" class="ghost" type="button">Back</button>
+      </div>
+      <div id="joinStep" class="panel mode-card" hidden>
+        <p class="eyebrow">Join a room</p>
+        <h2>Enter the room code</h2>
+        <label class="field">Room code <input id="roomCode" maxlength="4" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="ABCD" /></label>
+        <button id="joinRoom" class="primary" type="button">Join</button>
+        <p id="joinStatus" class="menu-status" role="status"></p>
+        <button id="backFromJoin" class="ghost" type="button">Back</button>
+      </div>
       <div id="setupStep" class="panel setup-card" hidden>
+        <p id="roomCodeBlock" class="room-code" hidden>
+          <span class="eyebrow">Room code</span>
+          <strong id="roomCodeLabel">----</strong>
+          <span class="hint">Friends use this code to join.</span>
+        </p>
         <p class="section-label">Choose a turtle</p>
         <div class="typePicker" role="radiogroup" aria-label="Turtle type"></div>
         <button id="startRace" class="primary" type="button">Start race</button>
-        <div id="joinSetup" hidden>
-          <p class="hint">Create a room or enter a code. Then ready up. The host starts the countdown.</p>
-          <label class="field">Name <input id="playerName" maxlength="16" value="Hatchling" autocomplete="nickname" /></label>
-          <div class="button-row">
-            <button id="createRoom" type="button">Create room</button>
-            <button id="joinRoom" type="button">Join room</button>
-          </div>
-          <label class="field">Room code <input id="roomCode" maxlength="4" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="ABCD" /></label>
-          <p id="onlineStatus" role="status"></p>
+        <div id="lobbySetup" hidden>
+          <p id="onlineStatus" class="menu-status" role="status"></p>
           <button id="readyToggle" class="primary" type="button">Ready</button>
           <button id="startOnline" class="primary" type="button" hidden>Start race</button>
         </div>

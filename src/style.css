@@ -241,11 +241,18 @@ body {
   font: 16px "Segoe UI", system-ui, sans-serif;
 }
 
-#onlineStatus {
-  min-height: 1.2em;
+.menu-status {
   margin: 10px 0 0;
-  color: #8a3b2a;
+  color: #3d534f;
   font-size: 14px;
+}
+
+.menu-status:empty {
+  display: none;
+}
+
+.menu-status[data-error="true"] {
+  color: #8a3b2a;
 }
 
 #lobbyBar {
@@ -715,6 +722,8 @@ body:has(.overlay:not([hidden])) #beachPreviewLink { display: none; }
 }
 
 #startScreen.front-door[data-step="mode"],
+#startScreen.front-door[data-step="online"],
+#startScreen.front-door[data-step="join"],
 #startScreen.front-door[data-step="setup"] {
   align-items: center;
   padding: 24px 16px;
@@ -803,12 +812,47 @@ body:has(.overlay:not([hidden])) #beachPreviewLink { display: none; }
 
 .mode-card .primary,
 .setup-card .primary,
-#joinSetup .primary {
+#lobbySetup .primary {
   width: 100%;
 }
 
-#joinSetup {
-  margin-top: 8px;
+#lobbySetup {
+  margin-top: 4px;
+}
+
+.room-code {
+  margin: 0 0 10px;
+  text-align: center;
+}
+
+.room-code .eyebrow {
+  margin-bottom: 2px;
+}
+
+.room-code strong {
+  display: block;
+  margin: 0 0 4px -0.14em;
+  color: #14343a;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  line-height: 1.1;
+}
+
+.room-code .hint {
+  display: block;
+}
+
+#roomCodeBlock[hidden] {
+  display: none;
+}
+
+#roomCode {
+  letter-spacing: 0.22em;
+  text-align: center;
+  text-transform: uppercase;
+  font-weight: 700;
 }
 
 .menu-card {
