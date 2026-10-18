@@ -89,12 +89,23 @@ artwork. There are no additional dependencies, downloaded models or paid service
 
 ![Raised launch pad and connected boarding walkway](docs/starship-walkway.jpg)
 
+## Turtle types and their moves
+
+Pick a turtle on the start or results screen. Power-ups use **X**; the turtle's own move uses **E** (keyboard) or **Y** (pad) and has a cooldown shown beside the item box.
+
+| Type | Health | Speed | Power-up slots | Own move |
+|---|---|---|---|---|
+| Regular | 50 | x1 | 2 | none |
+| Leatherback | 75 | x0.85 | 1 | **Body slam**, 18 s cooldown: surges about 6 m in a straight line with steering locked, stuns the rival for 2.2 s (and costs it 10 health) and stuns any low seagull it plows into. Debris cannot hurt it mid-slam. |
+| Kempy | 35 | x1.2 | 1 | **Spin dash**, 8 s cooldown (same as the snap): 1.5 s of extra speed and spinning, during which every hit is ignored (debris, bumps, sand, snaps, seagulls) and Shell Guard charges are kept. |
+| Snappy | 58 | x1 | 1 | **Snap**, 8 s cooldown: bites the rival or stuns gulls within reach. |
+
 ## Seagull
 
-Four seagulls guard the course: two on the dry sand (z = -8 and 4), one on the wet sand (z = 18) and one near the shore (z = 30). The ones at z = 4 and z = 30 are fliers: they circle about 5.5 metres up, stalk the turtle from above, then dive at where it is when the dive starts (steer sideways to dodge), and climb away if they miss. Walkers stay low and chase on the ground. Their spots are listed in `seagullSpawns`. Rules live in `src/mob/seagull.ts`, drawing in `src/mob/createSeagull.ts`.
+Four seagulls guard the course: two on the dry sand (z = -8 and 4), one on the wet sand (z = 18) and one near the shore (z = 30). The ones at z = 4 and z = 30 are fliers: they circle about 5.5 metres up, stalk the turtle from above, then dive at where it is when the dive starts (steer sideways to dodge), and climb away if they miss. A faint orange ring on the sand under each flier shows its dive range (stronger while it stalks), and a small marker appears where a dive will land. Walkers stay low and chase on the ground. Their spots are listed in `seagullSpawns`. Rules live in `src/mob/seagull.ts`, drawing in `src/mob/createSeagull.ts`.
 
 - It stays put until you come within 10 metres, then chases at 90% of the regular turtle's top speed on the ground under it. It gives up and flies home if it ends up 18 metres from its perch.
-- A touch costs 14 health and knocks the turtle and the gull apart. Shell Guard stops the damage and the turtle's knock-back (the gull still bounces off).
+- A touch costs 33% of the turtle's maximum health and knocks the turtle and the gull apart. Shell Guard stops the damage and the turtle's knock-back (the gull still bounces off).
 - At 0 health the gull swoops in, grabs the turtle, carries it up to 22 metres back toward the nest (never past the back of the beach), sets it down, and the turtle gets 40% of its health back. The gull then ignores you for a few seconds. Controls are locked during the carry.
 - Snappy's snap stuns any gull within reach (below 2.4 metres, so a gull circling high up is out of reach) for 2.5 seconds: it drops to the sand, is pushed back and cannot attack. A stunned gull also can't answer the rescue call, so a worn-out turtle waits until a gull recovers.
 - The model is `public/models/seagull.glb`. It has no animation, so the gull glides rather than flapping.

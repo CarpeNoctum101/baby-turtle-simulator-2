@@ -1,5 +1,7 @@
 import { healthFraction, isExhausted, type Health } from "../abilities/health";
-import { snapReady, snapRules, type SnapState } from "../abilities/snap";
+import type { RacerEffects } from "../abilities/abilityState";
+import { snapRules, type SnapState } from "../abilities/snap";
+import { slamRules, specialNames, spinRules, type SlamState, type SpecialId, type SpinState } from "../abilities/specials";
 
 export type HealthTone = "ok" | "low" | "empty";
 
@@ -19,20 +21,41 @@ export function formatHealth(health: Health, name = "Health"): HealthView {
   return { fraction, label: `${name} ${current}/${health.max}`, tone: fraction <= 0.3 ? "low" : "ok" };
 }
 
-export interface SnapView {
+export interface SpecialView {
   ready: boolean;
   /** Fill of the cooldown bar. 1 means ready. */
   meter: number;
   label: string;
 }
 
-export function formatSnap(snap: SnapState): SnapView {
-  if (snapReady(snap)) {
-    return { ready: true, meter: 1, label: "Snap ready (E / Y)" };
+export interface SpecialHudInput {
+  kind: SpecialId;
+  snap: SnapState;
+  slam: SlamState;
+  spin: SpinState;
+  effects: RacerEffects;
+}
+
+/** One cooldown readout for whichever move the turtle has. */
+export function formatSpecial(input: SpecialHudInput): SpecialView {
+  const name = specialNames[input.kind];
+  let cooldown = 0;
+  let total = 1;
+  if (input.kind === "snap") {
+    cooldown = input.snap.cooldownRemaining;
+    total = snapRules.cooldown;
+  } else if (input.kind === "slam") {
+    cooldown = input.slam.cooldownRemaining;
+    total = slamRules.cooldown;
+  } else {
+    cooldown = input.spin.cooldownRemaining;
+    total = spinRules.cooldown;
+    if (input.effects.spinRemaining > 0) {
+      return { ready: false, meter: input.effects.spinRemaining / spinRules.duration, label: `Spinning ${input.effects.spinRemaining.toFixed(1)}s` };
+    }
   }
-  return {
-    ready: false,
-    meter: 1 - snap.cooldownRemaining / snapRules.cooldown,
-    label: `Snap ${snap.cooldownRemaining.toFixed(1)}s`,
-  };
+  if (cooldown <= 0) {
+    return { ready: true, meter: 1, label: `${name} ready (E / Y)` };
+  }
+  return { ready: false, meter: 1 - cooldown / total, label: `${name} ${cooldown.toFixed(1)}s` };
 }

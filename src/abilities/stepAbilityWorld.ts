@@ -15,13 +15,29 @@ import {
   type Seagull,
   type Vec2,
 } from "../mob/seagull";
+import {
+  createSlam,
+  createSpin,
+  slamActive,
+  slamReady,
+  slamRules,
+  slamShift,
+  spinReady,
+  spinRules,
+  startSlam,
+  stepSlam,
+  stepSpin,
+  type SlamState,
+  type SpecialId,
+  type SpinState,
+} from "./specials";
 import { createSnap, snapRules, stepSnap, trySnap, type SnapState } from "./snap";
 import { createContactBook, resolveCollisions, stepContactBook, type ContactBook } from "./contacts";
 import { collectTideOrbs, createTideOrbs, stepTideOrbs, type TideOrb } from "./pickups";
 import { createSandCloud, ownCloudRemaining, resolveSandClouds, stepSandClouds, type SandCloud } from "./sandSpray";
 import type { TurtleMotion } from "../movement/stepTurtle";
 
-export type AbilityCue = "pickup" | "frenzy" | "shield" | "spray" | "block" | "bump" | "wave-arm" | "wave-boost" | "wave-miss" | "trail" | "snap" | "snap-hit" | "gull-hit" | "gull-swoop";
+export type AbilityCue = "pickup" | "frenzy" | "shield" | "spray" | "block" | "bump" | "wave-arm" | "wave-boost" | "wave-miss" | "trail" | "snap" | "snap-hit" | "gull-hit" | "gull-swoop" | "slam" | "slam-hit" | "spin";
 
 /** Everything the ability rules remember between frames, apart from the meshes. */
 export interface AbilityWorld {
@@ -34,12 +50,14 @@ export interface AbilityWorld {
   playerHealth: Health;
   rivalHealth: Health;
   snap: SnapState;
+  slam: SlamState;
+  spin: SpinState;
   seagulls: Seagull[];
   /** Speed of the push the turtle is still sliding from. */
   playerKnock: Vec2;
 }
 
-export const defaultMaxHealth = 100;
+export const defaultMaxHealth = 50;
 
 export function createAbilityWorld(
   maxHealth = defaultMaxHealth,
@@ -51,6 +69,8 @@ export function createAbilityWorld(
     playerHealth: createHealth(maxHealth),
     rivalHealth: createHealth(defaultMaxHealth),
     snap: createSnap(),
+    slam: createSlam(),
+    spin: createSpin(),
     loadout: createLoadout(),
     rivalEffects: createEffects(),
     orbs: createTideOrbs(),
@@ -71,10 +91,10 @@ export interface AbilityTick {
   pool: readonly AbilityId[];
   /** Abilities the player can hold at once. Defaults to 1. */
   itemSlots?: number;
-  /** True for turtles that can snap. */
-  canSnap?: boolean;
-  /** True on the frame the snap button goes down. */
-  snapPressed?: boolean;
+  /** The turtle's own move. Null or missing means it has none. */
+  special?: SpecialId | null;
+  /** True on the frame the special button goes down. */
+  specialPressed?: boolean;
 }
 
 export interface AbilityTickResult {
@@ -88,6 +108,8 @@ export interface AbilityTickResult {
   playerLift: number;
   /** True while a seagull has the turtle. Input is ignored for that time. */
   rescuing: boolean;
+  /** True while the turtle cannot steer: a seagull has it, or it is mid body slam. */
+  controlsLocked: boolean;
 }
 
 /**
@@ -106,6 +128,8 @@ export function stepAbilityWorld(world: AbilityWorld, tick: AbilityTick): Abilit
   let playerHealth = world.playerHealth;
   let rivalHealth = world.rivalHealth;
   let snap = world.snap;
+  let slam = world.slam;
+  let spin = world.spin;
   let seagulls = world.seagulls;
   const frozen = world.seagulls.some((gull) => isRescuePhase(gull.phase));
 
@@ -131,7 +155,7 @@ export function stepAbilityWorld(world: AbilityWorld, tick: AbilityTick): Abilit
     }
   }
 
-  if (tick.racing && !frozen && tick.canSnap && tick.snapPressed) {
+  if (tick.racing && !frozen && tick.special === "snap" && tick.specialPressed) {
     const bite = trySnap(snap, player, rival, rivalEffects);
     snap = bite.state;
     if (bite.started) {
@@ -159,6 +183,51 @@ export function stepAbilityWorld(world: AbilityWorld, tick: AbilityTick): Abilit
     if (bite.blocked) {
       cues.push("block");
     }
+  }
+
+  if (tick.racing && !frozen && tick.special === "slam" && tick.specialPressed && slamReady(slam)) {
+    slam = startSlam(slam, player.heading);
+    cues.push("slam");
+  }
+
+  if (tick.racing && !frozen && tick.special === "spin" && tick.specialPressed && spinReady(spin)) {
+    spin = { cooldownRemaining: spinRules.cooldown };
+    loadout = { ...loadout, effects: { ...loadout.effects, spinRemaining: spinRules.duration } };
+    cues.push("spin");
+  }
+
+  // The slam locks the turtle onto a straight line and stuns whatever it touches along the way.
+  let slamMove: Vec2 = { x: 0, z: 0 };
+  if (frozen && slamActive(slam)) {
+    slam = { ...slam, activeRemaining: 0 };
+  }
+  const slamming = tick.racing && slamActive(slam);
+  if (slamming) {
+    player = { ...player, speed: 0, heading: Math.atan2(slam.dirX, slam.dirZ) };
+    slamMove = slamShift(slam, tick.dt);
+    const hitIds = [...slam.hitIds];
+    if (!hitIds.includes("rival") && Math.hypot(rival.x - player.x, rival.z - player.z) <= slamRules.hitRadius) {
+      hitIds.push("rival");
+      const absorbed = absorbHit(rivalEffects, "ability");
+      rivalEffects = absorbed.effects;
+      if (absorbed.blocked) {
+        cues.push("block");
+      } else {
+        rivalEffects = { ...rivalEffects, stunRemaining: slamRules.stunSeconds };
+        rivalHealth = applyDamage(rivalHealth, slamRules.damage);
+        cues.push("slam-hit");
+      }
+    }
+    seagulls = seagulls.map((gull) => {
+      const close = Math.hypot(gull.x - player.x, gull.z - player.z) <= slamRules.hitRadius + 0.4;
+      if (!close || gull.y > slamRules.gullReachHeight || isRescuePhase(gull.phase) || hitIds.includes(gull.id)) {
+        return gull;
+      }
+      hitIds.push(gull.id);
+      cues.push("slam-hit");
+      return stunSeagull(gull, player);
+    });
+    slam = { ...slam, hitIds };
   }
 
   const wave = resolveWaveWindow(loadout.effects, tick.inWaveZone);
@@ -194,8 +263,8 @@ export function stepAbilityWorld(world: AbilityWorld, tick: AbilityTick): Abilit
     player: { id: "player", motion: player, effects: loadout.effects },
     rival: { id: "rival", motion: rival, effects: rivalEffects },
   };
-  // A turtle in a seagull's grip is off the ground, so nothing on the sand can hit it.
-  const collided = frozen
+  // A turtle in a seagull's grip is off the ground, and a slamming one plows through, so the sand cannot hit either.
+  const collided = frozen || slamming
     ? { ...bodies, book: world.contacts, blocked: false, bumped: false, playerDamage: 0, rivalDamage: 0 }
     : resolveCollisions(bodies.player, bodies.rival, world.contacts);
   player = collided.player.motion;
@@ -234,7 +303,7 @@ export function stepAbilityWorld(world: AbilityWorld, tick: AbilityTick): Abilit
         if (hit.blocked) {
           cues.push("block");
         } else {
-          playerHealth = applyDamage(playerHealth, seagullRules.damage);
+          playerHealth = applyDamage(playerHealth, playerHealth.max * seagullRules.damageFraction);
           player = { ...player, speed: player.speed * collisionSpeedScale };
           playerKnock = playerKnockFrom(next, player);
           cues.push("gull-hit");
@@ -263,7 +332,7 @@ export function stepAbilityWorld(world: AbilityWorld, tick: AbilityTick): Abilit
     if (!seagulls.some((gull) => isRescuePhase(gull.phase))) {
       const moved = stepKnock(playerKnock, tick.dt);
       playerKnock = moved.knock;
-      playerShift = moved.shift;
+      playerShift = { x: moved.shift.x + slamMove.x, z: moved.shift.z + slamMove.z };
     }
   }
 
@@ -272,6 +341,8 @@ export function stepAbilityWorld(world: AbilityWorld, tick: AbilityTick): Abilit
   rivalEffects = stepEffectsOnly(rivalEffects, tick.dt);
   clouds = stepSandClouds(clouds, tick.dt);
   snap = stepSnap(snap, tick.dt);
+  slam = stepSlam(slam, tick.dt);
+  spin = stepSpin(spin, tick.dt);
   if (windowBefore > 0 && loadout.effects.waveWindowRemaining === 0 && !hadBoost && loadout.effects.waveBoostRemaining === 0) {
     cues.push("wave-miss");
   }
@@ -283,6 +354,7 @@ export function stepAbilityWorld(world: AbilityWorld, tick: AbilityTick): Abilit
     playerShift,
     playerLift,
     rescuing: seagulls.some((gull) => isRescuePhase(gull.phase)),
+    controlsLocked: seagulls.some((gull) => isRescuePhase(gull.phase)) || slamActive(world.slam) || slamming,
     world: {
       loadout,
       rivalEffects,
@@ -293,6 +365,8 @@ export function stepAbilityWorld(world: AbilityWorld, tick: AbilityTick): Abilit
       playerHealth,
       rivalHealth,
       snap,
+      slam,
+      spin,
       seagulls,
       playerKnock,
     },
