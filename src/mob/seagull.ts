@@ -20,6 +20,17 @@ export const seagullRules = {
   knockDecay: 4.5,
   /** After a strike the gull is dazed for this long before it chases again. */
   recoverTime: 1.3,
+  /** Fliers: cruising height while circling, and the height they keep while stalking. */
+  cruiseHeight: 5.5,
+  circleRadius: 3,
+  circleSpeed: 0.9,
+  /** A flier starts its dive once it is this close (horizontally) to the turtle. */
+  diveRange: 5,
+  diveSpeed: 9,
+  /** A diving gull only counts as touching the turtle below this height. */
+  diveHitHeight: 1.8,
+  /** After a dive that misses, the gull climbs away for this long before stalking again. */
+  climbTime: 1.4,
   /** How long a snap leaves a gull flat on the sand, unable to attack. */
   stunTime: 2.5,
   perchHeight: 0.56,
@@ -43,7 +54,7 @@ export const seagullRules = {
   nestLimitZ: -30,
 } as const;
 
-export type SeagullPhase = "perched" | "chase" | "recover" | "stunned" | "swoop" | "grab" | "carry" | "drop" | "return";
+export type SeagullPhase = "perched" | "chase" | "dive" | "climb" | "recover" | "stunned" | "swoop" | "grab" | "carry" | "drop" | "return";
 
 export interface Vec2 {
   x: number;
@@ -65,14 +76,22 @@ export interface Seagull {
   grace: number;
   carryFrom: Vec2;
   carryTo: Vec2;
+  /** True for gulls that circle high up and dive at the turtle instead of walking in low. */
+  flier: boolean;
+  /** Where a dive is headed, and where it began. */
+  diveTo: Vec2;
+  diveFrom: { x: number; y: number; z: number };
 }
 
-export function createSeagull(id: string, home: Vec2): Seagull {
+export function createSeagull(id: string, home: Vec2, flier = false): Seagull {
   return {
+    flier,
+    diveTo: { x: home.x, z: home.z },
+    diveFrom: { x: home.x, y: 0, z: home.z },
     id,
     home,
     x: home.x,
-    y: seagullRules.perchHeight,
+    y: flier ? seagullRules.cruiseHeight : seagullRules.perchHeight,
     z: home.z,
     heading: Math.PI,
     phase: "perched",
@@ -84,12 +103,12 @@ export function createSeagull(id: string, home: Vec2): Seagull {
   };
 }
 
-/** Where the game puts seagulls: two on the dry sand, one on the wet sand, one near the shore. */
-export const seagullSpawns: readonly { id: string; home: Vec2 }[] = [
+/** Where the game puts seagulls. Two walk in low; the two marked `flier` circle high and dive. */
+export const seagullSpawns: readonly { id: string; home: Vec2; flier?: boolean }[] = [
   { id: "gull-1", home: { x: -5, z: -8 } },
-  { id: "gull-2", home: { x: 2.5, z: 4 } },
+  { id: "gull-2", home: { x: 2.5, z: 4 }, flier: true },
   { id: "gull-3", home: { x: -4, z: 18 } },
-  { id: "gull-4", home: { x: 4, z: 30 } },
+  { id: "gull-4", home: { x: 4, z: 30 }, flier: true },
 ];
 
 export function isRescuePhase(phase: SeagullPhase): boolean {
@@ -186,7 +205,7 @@ export function stepSeagull(gull: Seagull, input: SeagullInput): SeagullStep {
 
   switch (next.phase) {
     case "perched": {
-      next = settleAt(next, next.home, dt, seagullRules.perchHeight);
+      next = next.flier ? circleHome(next, dt) : settleAt(next, next.home, dt, seagullRules.perchHeight);
       if (input.canAttack && next.grace <= 0 && toPlayer <= seagullRules.aggroRadius) {
         next = { ...next, phase: "chase", phaseTime: 0 };
       }
@@ -197,12 +216,54 @@ export function stepSeagull(gull: Seagull, input: SeagullInput): SeagullStep {
         next = { ...next, phase: "return", phaseTime: 0 };
         break;
       }
+      if (next.flier) {
+        // Stalk from above, then commit to a dive at where the turtle is right now.
+        next = flyToward(next, input.player, chaseSpeed(next.z), dt, seagullRules.cruiseHeight);
+        if (distance(next, input.player) <= seagullRules.diveRange) {
+          next = {
+            ...next,
+            phase: "dive",
+            phaseTime: 0,
+            diveTo: { x: input.player.x, z: input.player.z },
+            diveFrom: { x: next.x, y: next.y, z: next.z },
+          };
+        }
+        break;
+      }
       next = flyToward(next, input.player, chaseSpeed(next.z), dt, seagullRules.flyHeight);
       contact = distance(next, input.player) <= seagullRules.hitRange;
       break;
     }
+    case "dive": {
+      if (!input.canAttack) {
+        next = { ...next, phase: "return", phaseTime: 0 };
+        break;
+      }
+      const total = Math.max(0.5, distance(next.diveFrom, next.diveTo));
+      next = flyToward(next, next.diveTo, seagullRules.diveSpeed, dt, next.y);
+      const left = distance(next, next.diveTo);
+      const progress = Math.min(1, 1 - left / total);
+      next = { ...next, y: next.diveFrom.y + (seagullRules.flyHeight - next.diveFrom.y) * progress };
+      contact = next.y <= seagullRules.diveHitHeight && distance(next, input.player) <= seagullRules.hitRange;
+      if (!contact && left <= 0.05) {
+        next = { ...next, phase: "climb", phaseTime: 0 };
+      }
+      break;
+    }
+    case "climb": {
+      // A missed dive carries on past the turtle while climbing back up.
+      const ahead = { x: next.x + Math.sin(next.heading) * 3, z: next.z + Math.cos(next.heading) * 3 };
+      next = { ...flyToward(next, ahead, chaseSpeed(next.z) * 1.5, dt, seagullRules.cruiseHeight), heading: next.heading };
+      if (next.phaseTime >= seagullRules.climbTime) {
+        next = { ...next, phase: "chase", phaseTime: 0 };
+      }
+      break;
+    }
     case "recover": {
-      next = { ...next, y: approach(next.y, seagullRules.flyHeight + 0.4, 3 * dt) };
+      next = {
+        ...next,
+        y: approach(next.y, next.flier ? seagullRules.cruiseHeight : seagullRules.flyHeight + 0.4, 3 * dt),
+      };
       if (next.phaseTime >= seagullRules.recoverTime) {
         next = { ...next, phase: "chase", phaseTime: 0 };
       }
@@ -264,7 +325,7 @@ export function stepSeagull(gull: Seagull, input: SeagullInput): SeagullStep {
       break;
     }
     case "return": {
-      next = flyToward(next, next.home, seagullRules.returnSpeed, dt, seagullRules.flyHeight);
+      next = flyToward(next, next.home, seagullRules.returnSpeed, dt, next.flier ? seagullRules.cruiseHeight : seagullRules.flyHeight);
       if (distance(next, next.home) <= 0.3) {
         next = { ...next, phase: "perched", phaseTime: 0 };
       }
@@ -309,4 +370,14 @@ function flyToward(gull: Seagull, target: Vec2, speed: number, dt: number, heigh
 function settleAt(gull: Seagull, spot: Vec2, dt: number, height: number): Seagull {
   const settled = flyToward(gull, spot, seagullRules.returnSpeed, dt, height);
   return { ...settled, heading: gull.heading };
+}
+
+/** A flier idles by looping around its home spot high in the air. */
+function circleHome(gull: Seagull, dt: number): Seagull {
+  const angle = gull.phaseTime * seagullRules.circleSpeed;
+  const spot = {
+    x: gull.home.x + Math.cos(angle) * seagullRules.circleRadius,
+    z: gull.home.z + Math.sin(angle) * seagullRules.circleRadius,
+  };
+  return flyToward(gull, spot, seagullRules.returnSpeed, dt, seagullRules.cruiseHeight);
 }

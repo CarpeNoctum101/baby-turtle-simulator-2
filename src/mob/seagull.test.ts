@@ -237,3 +237,102 @@ describe("stunned seagull", () => {
     }
   });
 });
+
+describe("flying seagull", () => {
+  const flierHome = { x: 0, z: 10 };
+  const spawn = () => createSeagull("f", flierHome, true);
+  const spawns = [{ id: "f", home: flierHome, flier: true }];
+
+  it("circles high above its home while the turtle is far away", () => {
+    let gull = spawn();
+    const heights: number[] = [];
+    for (let t = 0; t < 8; t += frame) {
+      gull = stepSeagull(gull, { dt: frame, player: { x: 0, z: -30 }, canAttack: true }).gull;
+      heights.push(gull.y);
+      expect(Math.hypot(gull.x - flierHome.x, gull.z - flierHome.z)).toBeLessThan(seagullRules.circleRadius + 0.5);
+    }
+    expect(gull.phase).toBe("perched");
+    expect(Math.min(...heights)).toBeGreaterThan(seagullRules.cruiseHeight - 0.2);
+  });
+
+  it("stalks from above, then dives and touches the turtle low to the ground", () => {
+    let gull: Seagull = { ...spawn(), phase: "chase" };
+    const player = { x: 0, z: 2 };
+    let contact = false;
+    let sawDive = false;
+    let highWhileStalking = true;
+    for (let t = 0; t < 8 && !contact; t += frame) {
+      const step = stepSeagull(gull, { dt: frame, player, canAttack: true });
+      gull = step.gull;
+      sawDive = sawDive || gull.phase === "dive";
+      if (gull.phase === "chase" && gull.y < seagullRules.cruiseHeight - 0.5) highWhileStalking = false;
+      contact = step.contact;
+    }
+    expect(sawDive).toBe(true);
+    expect(highWhileStalking).toBe(true);
+    expect(contact).toBe(true);
+    expect(gull.y).toBeLessThanOrEqual(seagullRules.diveHitHeight);
+  });
+
+  it("cannot hurt the turtle from high up, and a dodged dive climbs away", () => {
+    let gull: Seagull = { ...spawn(), phase: "dive", diveFrom: { x: 0, y: seagullRules.cruiseHeight, z: 10 }, diveTo: { x: 0, z: 2 } };
+    gull = { ...gull, x: 0, y: seagullRules.cruiseHeight, z: 10 };
+    // The turtle stands right under the gull's path but the gull is still high: no contact yet.
+    const early = stepSeagull(gull, { dt: frame, player: { x: 0, z: 9.8 }, canAttack: true });
+    expect(early.contact).toBe(false);
+    // The turtle has moved off to the side, so the dive ends in the sand and the gull climbs.
+    let next = gull;
+    let touched = false;
+    for (let t = 0; t < 3; t += frame) {
+      const step = stepSeagull(next, { dt: frame, player: { x: 8, z: 2 }, canAttack: true });
+      next = step.gull;
+      touched = touched || step.contact;
+      if (next.phase === "climb") break;
+    }
+    expect(touched).toBe(false);
+    expect(next.phase).toBe("climb");
+    const up = runGull(next, { x: 8, z: 2 }, seagullRules.climbTime + 0.05);
+    expect(up.phase).toBe("chase");
+    expect(up.y).toBeGreaterThan(seagullRules.flyHeight + 1);
+  });
+
+  it("dives faster than it stalks, but stalks slower than the turtle", () => {
+    expect(seagullRules.diveSpeed).toBeGreaterThan(chaseSpeed(0));
+    expect(chaseSpeed(0)).toBeLessThan(surfaces["dry-sand"].maxSpeed);
+  });
+
+  it("hurts and knocks back through the usual strike, then climbs back up", () => {
+    const world = createAbilityWorld(100, spawns);
+    world.seagulls[0] = {
+      ...world.seagulls[0]!,
+      phase: "dive",
+      x: 0,
+      y: 1,
+      z: 2.3,
+      diveFrom: { x: 0, y: 5, z: 8 },
+      diveTo: { x: 0, z: 2 },
+    };
+    const player = { ...createTurtleMotion(), x: 0, z: 2, speed: 3 };
+    const hit = worldTick(world, player);
+    expect(hit.world.playerHealth.current).toBe(100 - seagullRules.damage);
+    expect(hit.world.seagulls[0]!.phase).toBe("recover");
+    const later = runGull(hit.world.seagulls[0]!, { x: 0, z: 2 }, 1);
+    expect(later.y).toBeGreaterThan(2);
+  });
+
+  it("is out of the snap's reach while high up but can be stunned when low", () => {
+    const player = { ...createTurtleMotion(), x: 0, z: 9 };
+    const high = createAbilityWorld(115, spawns);
+    const missed = worldTick(high, player, { snapPressed: true, canSnap: true });
+    expect(missed.world.seagulls[0]!.phase).not.toBe("stunned");
+    const low = createAbilityWorld(115, spawns);
+    low.seagulls[0] = { ...low.seagulls[0]!, phase: "chase", x: 0, y: 1.1, z: 10 };
+    const bitten = worldTick(low, player, { snapPressed: true, canSnap: true });
+    expect(bitten.world.seagulls[0]!.phase).toBe("stunned");
+  });
+
+  it("makes two of the four game gulls fliers", () => {
+    expect(seagullSpawns.filter((spawn) => spawn.flier).length).toBe(2);
+    expect(seagullSpawns.length).toBe(4);
+  });
+});

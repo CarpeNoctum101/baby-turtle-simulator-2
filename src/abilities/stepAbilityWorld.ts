@@ -43,10 +43,10 @@ export const defaultMaxHealth = 100;
 
 export function createAbilityWorld(
   maxHealth = defaultMaxHealth,
-  spawns: readonly { id: string; home: Vec2 }[] = [],
+  spawns: readonly { id: string; home: Vec2; flier?: boolean }[] = [],
 ): AbilityWorld {
   return {
-    seagulls: spawns.map((spawn) => createSeagull(spawn.id, spawn.home)),
+    seagulls: spawns.map((spawn) => createSeagull(spawn.id, spawn.home, spawn.flier)),
     playerKnock: { x: 0, z: 0 },
     playerHealth: createHealth(maxHealth),
     rivalHealth: createHealth(defaultMaxHealth),
@@ -144,7 +144,9 @@ export function stepAbilityWorld(world: AbilityWorld, tick: AbilityTick): Abilit
     let gullBitten = false;
     if (bite.started) {
       seagulls = seagulls.map((gull) => {
-        if (Math.hypot(gull.x - player.x, gull.z - player.z) > snapRules.reach || isRescuePhase(gull.phase)) {
+        const outOfReach =
+          Math.hypot(gull.x - player.x, gull.z - player.z) > snapRules.reach || gull.y > snapRules.gullReachHeight;
+        if (outOfReach || isRescuePhase(gull.phase)) {
           return gull;
         }
         gullBitten = true;

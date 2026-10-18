@@ -8,6 +8,8 @@ export const snapRules = {
   cooldown: 4,
   /** The neck swivels, so the snap reaches a rival in any direction within this distance. */
   reach: 2.6,
+  /** A gull higher than this is out of the neck's reach. */
+  gullReachHeight: 2.4,
   lungeDuration: 0.3,
   /** How far the head shoots out at the peak of the lunge, in metres. */
   lungeDistance: 0.7,
