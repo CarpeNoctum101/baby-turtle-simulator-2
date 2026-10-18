@@ -9,7 +9,7 @@ Install Node.js 22.12+ with npm. Open a terminal in your copy of this project
 (the folder containing `package.json`). On this Mac:
 
 ```sh
-cd /baby-turtle-simulator-2
+cd /Users/leontruong/Downloads/Clones/baby-turtle-simulator-2
 npm ci
 npm run dev -- --host 127.0.0.1
 ```
@@ -46,24 +46,54 @@ printed **Local** URL. Run only one dependency installation at a time.
 - Select **Start race** or press Enter for a three-second countdown.
 - W / Up: crawl in the camera's direction. S / Down: move the opposite way.
   A / D or Left / Right: move sideways relative to the camera.
-- Space: brake. X: use the stored Tide Orb ability. R: restart at the nest with a new countdown.
+- Space: brake. X: use the stored item-box ability. R: restart at the nest with a new countdown.
   H: show or hide the readout.
 - Hold the right mouse button and drag to look around; the camera stays still while you crawl.
 - Scroll to zoom. The beach preview starts facing the palms with the readout hidden;
   use H or **Show readout** for controls/status. The cinematic takes over at the finish.
 - Xbox-compatible gamepad mapping remains available; press a controller button to expose it to the browser.
 
-Both course views include the start screen, race timer, local practice rival, Tide Orbs,
+Both course views include the start screen, race timer, local practice rival, item boxes,
 ability HUD and rematch. The preview contains natural dunes, five palms sharing geometry/materials, dune grass,
 weathered stones and driftwood, fine sand and reflective wet sand. A procedural sky
 adds clouds and a sunrise; the ocean has animated waves, shoreline foam, reflected
-sky and sunlight. The preview turtle has a patterned shell, scaled skin and tapered
-flippers, using the same movement and animation controls as the placeholder.
+sky and sunlight. Both views now use your supplied Blender sea turtle, with its actual
+painted skin/shell, eyes and eyelids. A weighted flipper rig keeps the mesh connected
+while crawling and boarding. The head and eyes stretch forward for Snappy's neck and
+snap move. Turtle types, health, specials, controls and race rules remain in place.
 
-Models, textures and sky reflections are created locally; there are no asset downloads,
-new dependencies, paid services or API keys. These are browser-friendly raster effects,
+The pickups are original Mario Kart-style spinning question-mark cubes. Their
+locations, random abilities, pickup radius and nine-second respawn are unchanged.
+The existing seagull model now unfolds and flaps its wings while airborne, holds
+them steadier during dives and folds them when perched or stunned.
+
+The turtle is **Ocean Turtle by der_On, CC BY 3.0**, from `Ocean Turtle.zip`;
+see [its original license and adaptation notes](public/credits/ocean-turtle.txt).
+The original archive stays intact. Environment textures/sky and item-box art are
+procedural; the bird retains its existing credits. No new packages, paid services
+or API keys were introduced for these changes. These are browser-friendly raster effects,
 not a reproduction of GTA V Enhanced's rendering system. Water animation is cosmetic:
 it does not add swimming physics or change the finish coordinates.
+
+The TMNT model, materials, tests and screenshots are preserved for future reference.
+Open http://127.0.0.1:5173/?beachPreview=1&turtle=tmnt to view it.
+
+To rebuild the sea-turtle assets with the free Blender already installed on this Mac:
+
+```sh
+/Applications/Blender.app/Contents/MacOS/Blender --background --factory-startup --disable-autoexec --python scripts/export_ocean_turtle.py
+```
+
+This is only needed after changing the source/converter. It preserves the original
+UVs, uses subdivision level 1 and bakes the old object-space normal map into a
+1024×1024 tangent-space map. Four meshes total 9,096 triangles per racer; textures
+and native Babylon vertex data total about 2.67 MB before HTTP compression.
+There is no separate turtle loader dependency or runtime Blender requirement.
+
+For a close-up wing animation check, run the Vite dev server and open
+http://127.0.0.1:5173/wing-preview.html. **Flying**, **Perched** and **Diving** use the
+same bird model and wing rig as the race. This developer page is separate from the
+production game entry point.
 
 ![Production beach preview](docs/beach-realistic.jpg)
 
@@ -82,6 +112,9 @@ stage, including orbit, restoring the beach, turtle, normal camera and lighting.
 The result screen appears after reaching space. Select **Rematch** or press Enter
 to start the countdown again.
 The sequence takes roughly 27 seconds after the finish and needs no further input.
+The settled deck sits at y=0.42 above the highest wave (y=0.12). During the ending,
+the horizon ocean replaces the race water/finish surfaces so they do not overlap.
+The hatch is wide enough for the imported Leatherback model with its flippers folded.
 There are no action descriptions or story captions; only the numeric countdown and
 a small restart hint remain on screen.
 The rocket, fictional boarding hatch, dock, exhaust and Earth are original procedural
@@ -114,12 +147,36 @@ Four seagulls guard the course: two on the dry sand (z = -8 and 4), one on the w
 Credit: "Seagull" by Bwinji Shamutete (https://sketchfab.com/MangyMedusa), CC BY 4.0,
 https://sketchfab.com/3d-models/seagull-dd79fddb754f47caa3145e7d184e3e58
 
+## People throwing nets (local race)
+
+Two beachgoers stand outside the course, on opposite sides. A nearby turtle makes
+them wind up for 0.85 seconds, then throw a visible rope net along a 1.1-second arc.
+The gold landing circle follows their aim until release, then stays fixed: move
+sideways to dodge it. A landed net lasts 1.8 seconds and can catch each racer once.
+
+A catch reduces speed and acceleration to 55% for 2.6 seconds. You can still steer
+and crawl; the ropes and the amber status message disappear when the timer ends.
+Nets take no health. Shell Guard consumes its charge to block a catch; Kempy's
+active spin also blocks it. A short grace period prevents repeated catches from
+immediately stacking. Both the player and the practice rival can be caught.
+
+These humans and ropes are original procedural geometry with shared rope buffers,
+merged body parts and no texture downloads or new dependencies. Nets freeze at the
+finish, disappear during the rocket cutscene and reset on R/rematch. They are only
+enabled in local races; the online server's existing race rules are unchanged.
+
+To try it: run `npm run dev -- --host 127.0.0.1`, open the printed URL with
+`?beachPreview=1`, and click **Start race**. Watch both sides as you approach the
+middle of the beach. The default course also includes the hazard.
+
 ## Milestones
 
 The merged prototype includes scene/input/movement/finish detection, local race flow,
 Tide Orb pickups and ability implementations. The optional beach study previews
 environment assets without marking the complete visual or performance milestones
-finished. Multiplayer and deployment remain separate work; the rival is local.
+finished. An online room can share the countdown, Tide Orbs, abilities and finish
+order when the local multiplayer server is running. Deployment is still separate.
+The practice rival is local.
 
 ## Automated checks and production preview
 

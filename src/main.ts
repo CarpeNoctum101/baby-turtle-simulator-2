@@ -9,8 +9,10 @@ const startButton = document.querySelector<HTMLButtonElement>("#startRace");
 const countdown = document.querySelector<HTMLElement>("#countdown");
 const raceTimer = document.querySelector<HTMLElement>("#raceTimer");
 const results = document.querySelector<HTMLElement>("#results");
+const resultsTitle = document.querySelector<HTMLElement>("#resultsTitle");
 const resultsTime = document.querySelector<HTMLElement>("#resultsTime");
 const resultsPlace = document.querySelector<HTMLElement>("#resultsPlace");
+const resultsTable = document.querySelector<HTMLElement>("#resultsTable");
 const rematchButton = document.querySelector<HTMLButtonElement>("#rematch");
 const abilityHud = document.querySelector<HTMLElement>("#abilityHud");
 const abilitySlot = document.querySelector<HTMLElement>("#abilitySlot");
@@ -18,9 +20,21 @@ const abilityIconBox = document.querySelector<HTMLElement>("#abilityIcon");
 const abilityTimer = document.querySelector<HTMLElement>("#abilityTimer");
 const abilityTimerLabel = document.querySelector<HTMLElement>("#abilityTimerLabel");
 const abilityMeterFill = document.querySelector<HTMLElement>("#abilityMeterFill");
+const playerName = document.querySelector<HTMLInputElement>("#playerName");
+const createRoomButton = document.querySelector<HTMLButtonElement>("#createRoom");
+const roomCodeInput = document.querySelector<HTMLInputElement>("#roomCode");
+const joinRoomButton = document.querySelector<HTMLButtonElement>("#joinRoom");
+const onlineStatus = document.querySelector<HTMLElement>("#onlineStatus");
+const lobbyBar = document.querySelector<HTMLElement>("#lobbyBar");
+const lobbySummary = document.querySelector<HTMLElement>("#lobbySummary");
+const readyToggle = document.querySelector<HTMLButtonElement>("#readyToggle");
+const startOnlineButton = document.querySelector<HTMLButtonElement>("#startOnline");
+const leaveRoomButton = document.querySelector<HTMLButtonElement>("#leaveRoom");
+const inputDevices = document.querySelector<HTMLFieldSetElement>("#inputChoice");
 
 const byId = (id: string) => document.querySelector<HTMLElement>(`#${id}`);
 const healthHud = byId("healthHud");
+const netStatus = byId("netStatus");
 const healthLabel = byId("healthLabel");
 const healthFill = byId("healthFill");
 const rivalHealthLabel = byId("rivalHealthLabel");
@@ -42,8 +56,10 @@ const ui: GameUi | null =
   countdown &&
   raceTimer &&
   results &&
+  resultsTitle &&
   resultsTime &&
   resultsPlace &&
+  resultsTable &&
   rematchButton &&
   abilityHud &&
   abilitySlot &&
@@ -51,7 +67,19 @@ const ui: GameUi | null =
   abilityTimer &&
   abilityTimerLabel &&
   abilityMeterFill &&
+  playerName &&
+  createRoomButton &&
+  roomCodeInput &&
+  joinRoomButton &&
+  onlineStatus &&
+  lobbyBar &&
+  lobbySummary &&
+  readyToggle &&
+  startOnlineButton &&
+  leaveRoomButton &&
+  inputDevices &&
   healthHud &&
+  netStatus &&
   healthLabel &&
   healthFill &&
   rivalHealthLabel &&
@@ -70,8 +98,10 @@ const ui: GameUi | null =
         countdown,
         raceTimer,
         results,
+        resultsTitle,
         resultsTime,
         resultsPlace,
+        resultsTable,
         rematchButton,
         abilityHud,
         abilitySlot,
@@ -79,7 +109,19 @@ const ui: GameUi | null =
         abilityTimer,
         abilityTimerLabel,
         abilityMeterFill,
+        playerName,
+        createRoomButton,
+        roomCodeInput,
+        joinRoomButton,
+        onlineStatus,
+        lobbyBar,
+        lobbySummary,
+        readyToggle,
+        startOnlineButton,
+        leaveRoomButton,
+        inputDevices,
         healthHud,
+        netStatus,
         healthLabel,
         healthFill,
         rivalHealthLabel,
@@ -99,13 +141,19 @@ if (!canvas || !ui) {
 }
 
 try {
-  const beachPreview = new URLSearchParams(window.location.search).get("beachPreview") === "1";
+  const params = new URLSearchParams(window.location.search);
+  const beachPreview = params.get("beachPreview") === "1";
+  const turtleModel = params.get("turtle") === "tmnt" ? "tmnt" : "ocean";
+  const credit = document.querySelector<HTMLElement>("#oceanTurtleCredit");
+  if (credit) credit.hidden = turtleModel === "tmnt";
   const previewLink = document.querySelector<HTMLAnchorElement>("#beachPreviewLink");
   if (beachPreview && previewLink) {
     previewLink.textContent = "Beach study · Back to course";
-    previewLink.href = "?";
+    previewLink.href = turtleModel === "tmnt" ? "?turtle=tmnt" : "?";
+  } else if (previewLink && turtleModel === "tmnt") {
+    previewLink.href = "?beachPreview=1&turtle=tmnt";
   }
-  const game = startGame(canvas, ui, beachPreview);
+  const game = startGame(canvas, ui, beachPreview, turtleModel);
 
   if (import.meta.hot) {
     import.meta.hot.dispose(() => {

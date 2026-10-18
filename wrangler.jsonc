@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "baby-turtle-simulator",
+  "main": "server/index.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "preview_urls": false,
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "RACE_ROOMS",
+        "class_name": "RaceRoom"
+      }
+    ]
+  },
+  "exports": {
+    "RaceRoom": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  }
+}

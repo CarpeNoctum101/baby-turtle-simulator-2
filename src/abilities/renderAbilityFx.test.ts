@@ -3,6 +3,8 @@ import { Scene } from "@babylonjs/core/scene";
 import { describe, expect, it } from "vitest";
 import { createDetailedTurtle } from "../turtle/createDetailedTurtle";
 import { createPlaceholderTurtle } from "../turtle/createPlaceholderTurtle";
+import { createOceanTurtle } from "../turtle/createOceanTurtle";
+import { createSculptedTurtle } from "../turtle/createSculptedTurtle";
 import { createEffects } from "./abilityState";
 import { createAbilityFx, type AbilityFxFrame } from "./renderAbilityFx";
 import { createAbilityWorld } from "./stepAbilityWorld";
@@ -11,6 +13,8 @@ describe("ability effects across both turtle materials", () => {
   it.each([
     ["standard", createPlaceholderTurtle],
     ["PBR", createDetailedTurtle],
+    ["Blender ocean", createOceanTurtle],
+    ["saved TMNT", createSculptedTurtle],
   ] as const)("applies and clears frenzy and shield glow on the %s turtle", (_name, createTurtle) => {
     const engine = new NullEngine();
     const scene = new Scene(engine);

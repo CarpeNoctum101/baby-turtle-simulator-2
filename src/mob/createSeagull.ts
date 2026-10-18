@@ -7,6 +7,7 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
 import "@babylonjs/loaders/glTF";
 import { diveWarning, seagullRules, type Seagull } from "./seagull";
+import { createBirdWingRig, type BirdWingRig } from "./createBirdWingRig";
 
 /**
  * "Seagull" by Bwinji Shamutete (Sketchfab, MangyMedusa), CC BY 4.0.
@@ -36,23 +37,25 @@ export function createSeagullMobs(scene: Scene, seagulls: readonly Seagull[]): S
     model.parent = root;
     model.scaling.setAll(seagullModel.scale);
     root.setEnabled(false);
-    return { root, model };
+    return { root, model, wings: [] as BirdWingRig[] };
   });
 
   LoadAssetContainerAsync(seagullModelUrl, scene)
     .then((container) => {
       rigs.forEach((rig, index) => {
-        const instance = container.instantiateModelsToScene((name) => `${seagulls[index]?.id ?? "gull"}-${name}`, false);
+        const instance = container.instantiateModelsToScene((name) => `${seagulls[index]?.id ?? "gull"}-${name}`, false, { doNotInstantiate: true });
         for (const node of instance.rootNodes) {
           node.parent = rig.model;
         }
+        rig.wings = rig.model.getChildMeshes().filter((mesh): mesh is Mesh => mesh instanceof Mesh && mesh.getTotalVertices() > 0)
+          .map(mesh => createBirdWingRig(mesh, index * 1.7));
         rig.root.setEnabled(true);
       });
     })
     .catch((error: unknown) => {
       console.warn("The seagull model could not be loaded. Using a plain stand-in.", error);
       rigs.forEach((rig, index) => {
-        buildStandIn(scene, rig.model, seagulls[index]?.id ?? "gull");
+        rig.wings = [buildStandIn(scene, rig.model, seagulls[index]?.id ?? "gull")];
         rig.root.setEnabled(true);
       });
     });
@@ -83,6 +86,7 @@ export function createSeagullMobs(scene: Scene, seagulls: readonly Seagull[]): S
         }
         const stunned = gull.phase === "stunned";
         const flapping = gull.y > 0.8 && !stunned;
+        for (const wings of rig.wings) wings.update(time, flapping, gull.phase === "dive");
         rig.root.position.set(gull.x, gull.y + (flapping ? Math.sin(time * 14 + index) * 0.06 : 0), gull.z);
         rig.root.rotation.y = gull.heading + seagullModel.yawOffset;
         rig.model.rotation.z = stunned ? 0.9 + Math.sin(time * 30) * 0.05 : flapping ? Math.sin(time * 14 + index) * 0.1 : 0;
@@ -91,16 +95,23 @@ export function createSeagullMobs(scene: Scene, seagulls: readonly Seagull[]): S
   };
 }
 
-function buildStandIn(scene: Scene, parent: TransformNode, id: string): void {
+function buildStandIn(scene: Scene, parent: TransformNode, id: string): BirdWingRig {
   const white = new StandardMaterial(`${id}StandInWhite`, scene);
   white.diffuseColor = new Color3(0.93, 0.94, 0.95);
   const body = MeshBuilder.CreateSphere(`${id}StandInBody`, { diameter: 0.6, segments: 8 }, scene);
   body.scaling.set(0.8, 0.8, 1.4);
   body.material = white;
   body.parent = parent;
-  const wings = MeshBuilder.CreateBox(`${id}StandInWings`, { width: 1.9, height: 0.04, depth: 0.5 }, scene);
-  wings.material = white;
-  wings.parent = parent;
+  const wings = [-1, 1].map(side => {
+    const pivot = new TransformNode(`${id}StandInShoulder${side}`, scene);
+    pivot.parent = parent; pivot.position.x = side * 0.2;
+    const wing = MeshBuilder.CreateBox(`${id}StandInWing${side}`, { width: 0.85, height: 0.04, depth: 0.5 }, scene);
+    wing.position.x = side * 0.425; wing.material = white; wing.parent = pivot;
+    return { pivot, side };
+  });
+  return { update(time, airborne, diving) {
+    for (const wing of wings) wing.pivot.rotation.z = airborne ? wing.side * (diving ? 0.1 : Math.sin(time * 10) * 0.55) : wing.side * -0.8;
+  } };
 }
 
 function createWarning(

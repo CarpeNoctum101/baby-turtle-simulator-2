@@ -147,3 +147,14 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Local Cloudflare Workers state. This is not a deployment.
+.wrangler/
+.dev.vars
+worker-configuration.d.ts
+
+# macOS folder metadata
+.DS_Store
+
+# Empty local scratch repository; it has no commit for the parent to reference.
+/Untitled/

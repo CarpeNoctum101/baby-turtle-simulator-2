@@ -26,7 +26,14 @@ Do not use paid AI asset-generation APIs or services that require a paid account
 
 Players start at a nesting beach. A countdown begins and the turtles crawl across a beach containing dry sand, wet sand, terrain variations, debris and other racers.
 
-Tide Orb pickups provide temporary abilities. Players use these abilities to gain speed or disrupt rivals. Players finish by reaching a defined ocean zone.
+Spinning Mario Kart-style question-mark item boxes provide temporary abilities. Players use these abilities to gain speed or disrupt rivals. Players finish by reaching a defined ocean zone. Keep the existing TideOrb protocol IDs and pickup rules internally.
+
+Local races also have two people outside the lane who throw rope nets. Telegraph
+each throw with an arm wind-up and a landing circle; lock the aim at release so it
+can be dodged. A catch slows crawling briefly without damage or locking controls.
+Shell Guard and Kempy's spin block incoming nets. Reset clears all net state and
+the hazard stops during the automatic ending. Keep this local until the online
+server has matching authoritative rules. Create the people and nets procedurally.
 
 The first version needs one polished beach course and a working start-to-finish race. Do not create an open world.
 
@@ -74,6 +81,14 @@ Aim for a realistic, atmospheric beach at dawn or sunrise.
 Include a detailed hatchling model, believable shell materials and flippers, textured sand, wet-sand transitions, footprints, directional lighting, environmental shadows, animated waves and shoreline foam.
 
 Prefer a small, polished environment with optimized assets and readable ability effects over a huge, expensive-to-render world.
+
+Use the sea turtle from the user-supplied Ocean Turtle.zip as the active racer, with
+the archive's CC BY 3.0 attribution to der_On. Convert locally with free Blender and
+keep the original archive. Preserve turtle types, neck/snap behavior, controls,
+abilities, race flow and the automatic ending. Retain the procedural TMNT model,
+materials and screenshots as a future reference; ?turtle=tmnt opens that version.
+Keep the settled rocket deck above every wave and render one ocean surface during
+the ending. Animate the existing seagull wings in flight, folding them when perched.
 
 Use original work or assets whose specific licenses permit the intended use.
 

@@ -8,7 +8,8 @@ import { Scene } from "@babylonjs/core/scene";
 import type { RacerEffects } from "./abilityState";
 import type { BubbleShot } from "./bubble";
 import { debrisLayout } from "./contacts";
-import { tideOrbSpots, type TideOrb } from "./pickups";
+import type { TideOrb } from "./pickups";
+import { createItemBoxes } from "./createItemBoxes";
 import { sandCloudAnchor, type SandCloud } from "./sandSpray";
 import { oceanTrail } from "./trail";
 import { course, waveZone } from "../movement/course";
@@ -41,10 +42,10 @@ export interface AbilityFx {
 
 const black = new Color3(0, 0, 0);
 
-/** Orbs, debris, the shell bubble, the sand puff, the wave band, and the trail. Meshes are created once. */
+/** Item boxes, debris, the shell bubble, sand puff, wave band and trail, created once. */
 export function createAbilityFx(scene: Scene, playerVisual: TransformNode): AbilityFx {
-  const orbs = tideOrbSpots.map((spot, index) => createOrb(scene, spot.id, spot.x, spot.z, index));
-  const clouds = [0, 1, 2].map((index) => createCloud(scene, index));
+  const orbs = createItemBoxes(scene);
+  const clouds = Array.from({ length: 8 }, (_, index) => createCloud(scene, index));
   const shield = createShield(scene, playerVisual);
   const wave = createWaveBand(scene);
   const trail = createTrail(scene);
@@ -59,7 +60,9 @@ export function createAbilityFx(scene: Scene, playerVisual: TransformNode): Abil
         const ready = (state?.respawnIn ?? 1) <= 0;
         orb.isVisible = ready;
         if (ready) {
-          orb.position.y = 0.62 + Math.sin(frame.time * 2.4 + index) * 0.08;
+          orb.position.y = 0.95 + Math.sin(frame.time * 2.4 + index) * 0.12;
+          orb.rotation.set(0.12 + Math.sin(frame.time * 1.2 + index) * 0.08,
+            frame.time * 0.9 + index * 0.65, 0.15);
         }
       }
 
@@ -106,18 +109,6 @@ export function createAbilityFx(scene: Scene, playerVisual: TransformNode): Abil
       }
     },
   };
-}
-
-function createOrb(scene: Scene, id: string, x: number, z: number, index: number): Mesh {
-  const orb = MeshBuilder.CreateSphere(id, { diameter: 0.46, segments: 12 }, scene);
-  orb.position.set(x, 0.62, z);
-  const material = new StandardMaterial(`${id}Material`, scene);
-  const shift = index % 2 === 0 ? 0 : 0.08;
-  material.diffuseColor = new Color3(0.15, 0.55, 0.52);
-  material.emissiveColor = new Color3(0.15 + shift, 0.75, 0.68);
-  material.specularColor = new Color3(0.2, 0.25, 0.25);
-  orb.material = material;
-  return orb;
 }
 
 function createCloud(scene: Scene, index: number): { root: TransformNode } {

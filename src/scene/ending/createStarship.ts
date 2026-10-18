@@ -74,28 +74,28 @@ export function createStarship(scene: Scene) {
     nozzle.position.set(Math.cos(angle)*0.7,0.95,Math.sin(angle)*0.7);
     attach(nozzle,ship,dark);
   }
-  const hatchBack=MeshBuilder.CreateBox("starshipHatchInterior", { width:1.2,height:1.45,depth:0.06 },scene);
+  const hatchBack=MeshBuilder.CreateBox("starshipHatchInterior", { width:endingPlan.hatchHalfWidth*2,height:1.45,depth:0.06 },scene);
   hatchBack.position.set(0,2.3,-1.37);
   attach(hatchBack,ship,dark);
-  const hatch=MeshBuilder.CreateBox("starshipSlidingHatch", { width:1.22,height:1.47,depth:0.06 },scene);
+  const hatch=MeshBuilder.CreateBox("starshipSlidingHatch", { width:endingPlan.hatchHalfWidth*2+0.02,height:1.47,depth:0.06 },scene);
   hatch.position.set(0,2.3,-1.43);
   attach(hatch,ship,steel);
   for (const side of [-1,1]) {
     const frame=MeshBuilder.CreateBox(`starshipHatchFrame${side}`, { width:0.08,height:1.6,depth:0.1 },scene);
-    frame.position.set(side*0.66,2.3,-1.44);
+    frame.position.set(side*(endingPlan.hatchHalfWidth+0.06),2.3,-1.44);
     attach(frame,ship,amber);
   }
   addWordmark();
 
   const pad=MeshBuilder.CreateCylinder("starshipOceanLaunchPad", { diameter:12,height:1.2,tessellation:64 },scene);
-  pad.position.set(0,-0.36,shipZ);
+  pad.position.set(0,endingPlan.deckY-0.6,shipZ);
   attach(pad,lift,deck);
-  const padCircle=MeshBuilder.CreateTube("starshipPadCircle", { path:Array.from({length:65},(_,i)=>new Vector3(Math.cos(i/64*Math.PI*2)*5.1,0.25,shipZ+Math.sin(i/64*Math.PI*2)*5.1)),radius:0.06,tessellation:4 },scene);
+  const padCircle=MeshBuilder.CreateTube("starshipPadCircle", { path:Array.from({length:65},(_,i)=>new Vector3(Math.cos(i/64*Math.PI*2)*5.1,endingPlan.deckY+0.015,shipZ+Math.sin(i/64*Math.PI*2)*5.1)),radius:0.06,tessellation:4 },scene);
   attach(padCircle,lift,white);
   const walkwayEdges=[-1,1].map(side=>[
-    new Vector3(side*endingPlan.arrivalHalfWidth,0.04,endingPlan.arrivalZ-1),
-    new Vector3(side*endingPlan.arrivalHalfWidth,0.04,endingPlan.arrivalZ),
-    new Vector3(side*3,0.24,endingPlan.entry.z),new Vector3(side*1.8,0.24,rampZ),
+    new Vector3(side*endingPlan.arrivalHalfWidth,endingPlan.deckY,endingPlan.arrivalZ-1),
+    new Vector3(side*endingPlan.arrivalHalfWidth,endingPlan.deckY,endingPlan.arrivalZ),
+    new Vector3(side*3,endingPlan.deckY,endingPlan.entry.z),new Vector3(side*1.8,endingPlan.deckY,rampZ),
   ]);
   const walkway=MeshBuilder.CreateRibbon("starshipArrivalWalkway", { pathArray:walkwayEdges,
     sideOrientation:Mesh.DOUBLESIDE },scene);
@@ -118,12 +118,12 @@ export function createStarship(scene: Scene) {
   const legs=Mesh.MergeMeshes(supports,true,false);
   if(legs)attach(legs,lift,steel);
   const ramp=MeshBuilder.CreateRibbon("starshipBoardingRamp", { pathArray:[-1.13,1.13].map(x=>[
-    new Vector3(x,0.24,rampZ),new Vector3(x,1.84,hatchZ),
+    new Vector3(x,endingPlan.deckY,rampZ),new Vector3(x,endingPlan.hatch.y+0.04,hatchZ),
   ]),sideOrientation:Mesh.DOUBLESIDE },scene);
   attach(ramp,lift,deck);
   const railMeshes: Mesh[]=[];
   for (const side of [-1,1]) {
-    const start=new Vector3(side*1.13,1.05,rampZ),end=new Vector3(side*1.13,2.65,hatchZ);
+    const start=new Vector3(side*1.13,endingPlan.deckY+0.81,rampZ),end=new Vector3(side*1.13,endingPlan.hatch.y+0.85,hatchZ);
     railMeshes.push(MeshBuilder.CreateTube("rampRail",{path:[start,end],radius:0.035,tessellation:6},scene));
     for(let i=0;i<=5;i++) {
       const p=Vector3.Lerp(start,end,i/5);

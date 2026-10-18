@@ -39,8 +39,10 @@ import { collectTideOrbs, createTideOrbs, stepTideOrbs, type TideOrb } from "./p
 import { bubbleRules, consumeBubbleHits, launchBubble, stepBubbleShots, type BubbleShot } from "./bubble";
 import { createSandCloud, ownCloudRemaining, resolveSandClouds, stepSandClouds, type SandCloud } from "./sandSpray";
 import type { TurtleMotion } from "../movement/stepTurtle";
+import { catchInNet, createNetHazards, netRules, stepNetHazards, type NetHazards, type NetThrowerSpawn } from "../mob/netThrower";
 
-export type AbilityCue = "pickup" | "frenzy" | "shield" | "spray" | "block" | "bump" | "wave-arm" | "wave-boost" | "wave-miss" | "trail" | "snap" | "snap-hit" | "gull-hit" | "gull-swoop" | "slam" | "slam-hit" | "spin" | "bubble" | "bubble-trap";
+
+export type AbilityCue = "pickup" | "frenzy" | "shield" | "spray" | "block" | "bump" | "wave-arm" | "wave-boost" | "wave-miss" | "trail" | "snap" | "snap-hit" | "gull-hit" | "gull-swoop" | "slam" | "slam-hit" | "spin" | "net-catch" | "bubble" | "bubble-trap";
 
 /** Everything the ability rules remember between frames, apart from the meshes. */
 export interface AbilityWorld {
@@ -56,6 +58,7 @@ export interface AbilityWorld {
   slam: SlamState;
   spin: SpinState;
   seagulls: Seagull[];
+  nets: NetHazards;
   /** Speed of the push the turtle is still sliding from. */
   playerKnock: Vec2;
   bubbles: BubbleShot[];
@@ -68,9 +71,11 @@ export const defaultMaxHealth = 50;
 export function createAbilityWorld(
   maxHealth = defaultMaxHealth,
   spawns: readonly { id: string; home: Vec2; flier?: boolean }[] = [],
+  netSpawns: readonly NetThrowerSpawn[] = [],
 ): AbilityWorld {
   return {
     seagulls: spawns.map((spawn) => createSeagull(spawn.id, spawn.home, spawn.flier)),
+    nets: createNetHazards(netSpawns),
     playerKnock: { x: 0, z: 0 },
     bubbles: [],
     bubbleCooldown: 0,
@@ -389,6 +394,28 @@ export function stepAbilityWorld(world: AbilityWorld, tick: AbilityTick): Abilit
     }
   }
 
+  const netTick = stepNetHazards(world.nets, {
+    dt: tick.dt, racing: tick.racing, player, rival,
+    playerGrounded: playerLift < 0.5 && !slamming && !seagulls.some(gull => isRescuePhase(gull.phase)),
+  });
+  let nets = netTick.state;
+  for (const racer of netTick.hits) {
+    const hit = absorbHit(racer === "player" ? loadout.effects : rivalEffects, "ability");
+    if (racer === "player") loadout = { ...loadout, effects: hit.effects };
+    else rivalEffects = hit.effects;
+    if (hit.blocked) {
+      cues.push("block");
+      continue;
+    }
+    nets = catchInNet(nets, racer);
+    if (racer === "player") {
+      player = { ...player, speed: player.speed * netRules.slowMultiplier };
+      cues.push("net-catch");
+    } else {
+      rival = { ...rival, speed: rival.speed * netRules.slowMultiplier };
+    }
+  }
+
   const hadBoost = loadout.effects.waveBoostRemaining > 0;
   loadout = stepLoadout(loadout, tick.dt);
   rivalEffects = stepEffectsOnly(rivalEffects, tick.dt);
@@ -421,6 +448,7 @@ export function stepAbilityWorld(world: AbilityWorld, tick: AbilityTick): Abilit
       slam,
       spin,
       seagulls,
+      nets,
       playerKnock,
       bubbles,
       bubbleCooldown,
