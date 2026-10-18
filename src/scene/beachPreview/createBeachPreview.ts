@@ -18,6 +18,7 @@ import { createOcean } from "./createOcean";
 import { createBeachLand } from "./createBeachLand";
 import { beachHeight, seededRandom } from "./landscape";
 import { course } from "../../movement/course";
+import { createCoconuts } from "./createCoconuts";
 
 /** A visual study isolated from the unchanged race prototype and movement rules. */
 export function createBeachPreview(scene: Scene, sun: DirectionalLight, fill: HemisphericLight): void {
@@ -41,7 +42,8 @@ export function createBeachPreview(scene: Scene, sun: DirectionalLight, fill: He
   createAtmosphere(scene, sunDirection);
 
   // Replace only the preview's visual blocks. Logical surface/finish coordinates stay intact.
-  for (const name of ["surroundingSand", "drySand", "wetSand", "shallowWater", "finishZone", "rightBerm", "leftBerm", "nest"]) {
+  for (const name of ["surroundingSand", "drySand", "wetSand", "shallowWater", "finishZone", "rightBerm", "leftBerm", "nest",
+    "startPad-left", "startPad-center", "startPad-right"]) {
     scene.getMeshByName(name)?.setEnabled(false);
   }
   for (const mesh of scene.meshes) if (mesh.name.startsWith("pebble")) mesh.setEnabled(false);
@@ -50,12 +52,14 @@ export function createBeachPreview(scene: Scene, sun: DirectionalLight, fill: He
 
   const palmX = -course.halfWidth - 1.4;
   const palm = createPalm(scene, new Vector3(palmX, beachHeight(palmX, -10), -10));
-  for (const [i, spot] of [
+  const palmSpots = [
+    { x: palmX, z: -10, scale: 1, yaw: 0 },
     { x: course.halfWidth+4.8, z: -6, scale: 1.12, yaw: 1.5 },
     { x: -course.halfWidth-7, z: 3, scale: 0.92, yaw: -0.7 },
     { x: -course.halfWidth-10, z: -24, scale: 1.18, yaw: 0.8 },
     { x: course.halfWidth+9, z: 9, scale: 0.9, yaw: 2.7 },
-  ].entries()) {
+  ];
+  for (const [i, spot] of palmSpots.slice(1).entries()) {
     const root = new TransformNode(`previewPalmInstance${i}`, scene);
     root.position.set(spot.x, beachHeight(spot.x, spot.z), spot.z);
     root.scaling.setAll(spot.scale);
@@ -65,6 +69,7 @@ export function createBeachPreview(scene: Scene, sun: DirectionalLight, fill: He
       instance.parent = root;
     }
   }
+  createCoconuts(scene, palmSpots);
   createGrass(scene);
 
   const shadows = new ShadowGenerator(Math.min(2048, scene.getEngine().getCaps().maxTextureSize), sun);
@@ -81,10 +86,10 @@ export function createBeachPreview(scene: Scene, sun: DirectionalLight, fill: He
   shadows.setDarkness(0.12);
   // Wait for the caller's turtle to exist. Instances share source geometry/materials.
   scene.onBeforeRenderObservable.addOnce(() => {
-    const turtle = scene.getTransformNodeByName("turtle");
+    const racers = [scene.getTransformNodeByName("turtle"), scene.getTransformNodeByName("rival")];
     for (const mesh of scene.meshes) {
-      const isTurtle = !!turtle && mesh.isDescendantOf(turtle);
-      if (mesh.isEnabled() && (isTurtle || /^(palm|previewRock|previewDriftwood|previewGrass)/.test(mesh.name))) {
+      const isTurtle = racers.some(racer => !!racer && mesh.isDescendantOf(racer));
+      if (mesh.isEnabled() && (isTurtle || /^(palm|previewRock|previewDriftwood|previewGrass|previewCoconut)/.test(mesh.name))) {
         shadows.addShadowCaster(mesh, false);
         if (mesh instanceof InstancedMesh) mesh.sourceMesh.receiveShadows = true;
         else mesh.receiveShadows = !isTurtle;

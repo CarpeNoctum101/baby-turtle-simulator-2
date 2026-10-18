@@ -2,6 +2,9 @@ import { NullEngine } from "@babylonjs/core/Engines/nullEngine";
 import { Scene } from "@babylonjs/core/scene";
 import { describe, expect, it } from "vitest";
 import { createDetailedTurtle } from "../turtle/createDetailedTurtle";
+import { createCyberTurtle } from "../turtle/createCyberTurtle";
+import { createSculptedTurtle } from "../turtle/createSculptedTurtle";
+import { createOceanTurtle } from "../turtle/createOceanTurtle";
 import { createPlaceholderTurtle } from "../turtle/createPlaceholderTurtle";
 import { createEffects } from "./abilityState";
 import { createAbilityFx, type AbilityFxFrame } from "./renderAbilityFx";
@@ -11,6 +14,9 @@ describe("ability effects across both turtle materials", () => {
   it.each([
     ["standard", createPlaceholderTurtle],
     ["PBR", createDetailedTurtle],
+    ["cybernetic", createCyberTurtle],
+    ["sculpted", createSculptedTurtle],
+    ["Blender ocean", createOceanTurtle],
   ] as const)("applies and clears frenzy and shield glow on the %s turtle", (_name, createTurtle) => {
     const engine = new NullEngine();
     const scene = new Scene(engine);

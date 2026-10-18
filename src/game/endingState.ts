@@ -25,14 +25,17 @@ export interface EndingFrame {
 
 // Shared by the route and the 3D dock, so the turtle really follows the boarding ramp.
 const finishZ = course.finish.minZ;
+// The ocean peaks at 0.12. Keep the settled deck comfortably above every wave.
+const deckY = 0.42;
 export const endingPlan = {
+  deckY,
   arrivalZ: finishZ,
   arrivalHalfWidth: course.halfWidth + 0.5,
-  ship: { x: 0, y: 0.24, z: finishZ + 18 },
-  entry: { x: 0, y: 0.2, z: finishZ + 6 },
-  rampFoot: { x: 0, y: 0.2, z: finishZ + 9 },
-  hatch: { x: 0, y: 1.8, z: finishZ + 16.55 },
-  cabin: { x: 0, y: 1.8, z: finishZ + 18 },
+  ship: { x: 0, y: deckY, z: finishZ + 18 },
+  entry: { x: 0, y: deckY - 0.04, z: finishZ + 6 },
+  rampFoot: { x: 0, y: deckY - 0.04, z: finishZ + 9 },
+  hatch: { x: 0, y: deckY + 1.56, z: finishZ + 16.55 },
+  cabin: { x: 0, y: deckY + 1.56, z: finishZ + 18 },
   riseSeconds: 4.8,
   submergedDepth: 18,
   walkingSpeed: 2.6,
@@ -45,7 +48,7 @@ export const endingPlan = {
 export function createEndingState(motion: TurtleMotion): EndingState {
   return {
     elapsed: 0,
-    start: { x: motion.x, y: 0.2 * clamp01((motion.z - finishZ) / 6), z: motion.z },
+    start: { x: motion.x, y: 0, z: motion.z },
     startHeading: motion.heading,
   };
 }
@@ -57,7 +60,8 @@ export function stepEnding(state: EndingState, dt: number): EndingState {
 }
 
 export function sampleEnding(state: EndingState): EndingFrame {
-  const path = [state.start, endingPlan.entry, endingPlan.rampFoot, endingPlan.hatch];
+  const settledStart = { ...state.start, y: endingPlan.entry.y };
+  const path = [settledStart, endingPlan.entry, endingPlan.rampFoot, endingPlan.hatch];
   const totalDistance = path.slice(1).reduce((sum, p, i) => sum + distance(path[i], p), 0);
   const walkDuration = totalDistance / endingPlan.walkingSpeed;
   let phaseTime = state.elapsed;
@@ -65,9 +69,11 @@ export function sampleEnding(state: EndingState): EndingFrame {
     walkProgress: clamp01((state.elapsed - endingPlan.riseSeconds) / walkDuration), countdown: 0, altitude: 0, spaceBlend: 0 };
   if (phaseTime < endingPlan.riseSeconds) {
     const riseProgress = smooth01(phaseTime / endingPlan.riseSeconds);
+    const platformOffset = -endingPlan.submergedDepth * (1 - riseProgress);
     return { ...base, phase: "rising", phaseTime, riseProgress,
-      platformOffset: -endingPlan.submergedDepth * (1 - riseProgress),
-      turtle: { ...state.start }, heading: state.startHeading, speed: 0, boarded: false };
+      platformOffset,
+      turtle: { ...state.start, y: Math.max(state.start.y, settledStart.y + platformOffset) },
+      heading: state.startHeading, speed: 0, boarded: false };
   }
   phaseTime -= endingPlan.riseSeconds;
   const walked = Math.min(totalDistance, phaseTime * endingPlan.walkingSpeed);

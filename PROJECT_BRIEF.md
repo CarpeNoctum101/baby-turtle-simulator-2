@@ -26,7 +26,7 @@ Do not use paid AI asset-generation APIs or services that require a paid account
 
 Players start at a nesting beach. A countdown begins and the turtles crawl across a beach containing dry sand, wet sand, terrain variations, debris and other racers.
 
-Tide Orb pickups provide temporary abilities. Players use these abilities to gain speed or disrupt rivals. Players finish by reaching a defined ocean zone.
+Spinning question-mark item boxes provide temporary abilities. Players use these abilities to gain speed or disrupt rivals. Players finish by reaching a defined ocean zone.
 
 The first version needs one polished beach course and a working start-to-finish race. Do not create an open world.
 
@@ -65,7 +65,7 @@ Use an extensible ability system with a HUD, pickups, cooldowns, duration, activ
 
 These are fictionalized arcade mechanics inspired by turtle anatomy and behavior, not claims that real turtles possess supernatural powers.
 
-Use Tide Orbs to distribute abilities. First implement simple random pickups. Add position-aware balancing only after the main system works.
+Use item boxes to distribute abilities. First implement simple random pickups. Add position-aware balancing only after the main system works.
 
 ## Visual direction
 
@@ -74,6 +74,13 @@ Aim for a realistic, atmospheric beach at dawn or sunrise.
 Include a detailed hatchling model, believable shell materials and flippers, textured sand, wet-sand transitions, footprints, directional lighting, environmental shadows, animated waves and shoreline foam.
 
 Prefer a small, polished environment with optimized assets and readable ability effects over a huge, expensive-to-render world.
+
+Use the sea turtle from the user-supplied Ocean Turtle.zip as the active racer.
+Convert its Blender mesh and textures locally with free Blender, preserve its
+CC BY 3.0 attribution to der_On, and keep the original archive. Preserve the existing
+movement, camera, abilities and finish sequence; adapt flipper animation and the
+folded boarding pose to this mesh. Keep the original procedural TMNT-inspired racer,
+materials and screenshots as a future reference, accessible with ?turtle=tmnt.
 
 Use original work or assets whose specific licenses permit the intended use.
 
@@ -106,7 +113,7 @@ Include controller connection feedback and configurable dead zones.
 1. Working 3D browser scene.
 2. Keyboard and gamepad input.
 3. Turtle movement and finish detection.
-4. Race flow and Tide Orb pickups.
+4. Race flow and item-box pickups.
 5. Initial abilities: Flipper Frenzy, Shell Guard and Sand Spray.
 6. Realistic character and environment assets.
 7. Multiplayer implementation and validation.

@@ -1,5 +1,4 @@
 import { Engine } from "@babylonjs/core/Engines/engine";
-import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Scene } from "@babylonjs/core/scene";
 import { createEffects, isTrailVisible, speedModifiers } from "../abilities/abilityState";
 import { abilityCatalog, raceAbilityPool } from "../abilities/catalog";
@@ -23,8 +22,9 @@ import { canDrive, countdownLabel, createRaceState, formatRaceTime, startCountdo
 import { createRivalMotion, raceStanding, stepRival } from "../race/stepRival";
 import { createBeachScene } from "../scene/createBeachScene";
 import { stepTurtleAnimation, type TurtleAnimation } from "../turtle/animateTurtle";
-import { createPlaceholderTurtle, type PlaceholderTurtle } from "../turtle/createPlaceholderTurtle";
-import { createDetailedTurtle } from "../turtle/createDetailedTurtle";
+import type { PlaceholderTurtle } from "../turtle/createPlaceholderTurtle";
+import { createSculptedTurtle } from "../turtle/createSculptedTurtle";
+import { createOceanTurtle } from "../turtle/createOceanTurtle";
 import { createEndingState, sampleEnding, stepEnding, type EndingPhase, type EndingState } from "./endingState";
 import { createSpaceEnding } from "../scene/ending/createSpaceEnding";
 
@@ -59,15 +59,12 @@ const idleDrive: DriveInput = { throttle: 0, steer: 0, brake: false };
  * Builds the beach once, then runs a single draw loop.
  * Starting again resets the turtle, the rival, the orbs, and any ability that was still running.
  */
-export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = false): RunningGame {
+export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = false, turtleModel: "ocean" | "tmnt" = "ocean"): RunningGame {
   const engine = new Engine(canvas, true, { adaptToDeviceRatio: true });
   const scene = createBeachScene(engine, beachPreview);
-  const turtle = beachPreview ? createDetailedTurtle(scene) : createPlaceholderTurtle(scene);
-  const rivalTurtle = createPlaceholderTurtle(scene, {
-    id: "rival",
-    skin: new Color3(0.55, 0.62, 0.4),
-    shell: new Color3(0.25, 0.4, 0.48),
-  });
+  const turtle = turtleModel === "tmnt" ? createSculptedTurtle(scene) : createOceanTurtle(scene);
+  const rivalTurtle = turtleModel === "tmnt" ? createSculptedTurtle(scene, { id: "rival", redMask: true })
+    : createOceanTurtle(scene, { id: "rival" });
   const camera = createFollowCamera(scene);
   // Keep camera-relative forward aimed at the finish in both course views.
   const initialLook: LookOffsets = { yaw: 0, pitch: beachPreview ? 0.22 : 0 };
@@ -236,11 +233,14 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     const playerSpeed = endingFrame?.speed ?? (canDrive(race.phase) ? motion.speed : 0);
     stepTurtleAnimation(animation, turtle.visual, turtle.flippers, playerSpeed, dt,
       !endingFrame && world.loadout.effects.frenzyRemaining > 0);
-    if (endingFrame?.phase === "boarding") {
-      const tuck = Math.min(1, endingFrame.phaseTime / 0.5);
+    const tuck = endingFrame?.phase === "boarding" ? 1
+      : endingFrame?.phase === "walking" ? Math.max(0, (endingFrame.walkProgress - 0.9) / 0.1) : 0;
+    if (tuck > 0) {
+      // Fold the arms before reaching the doorway, then hold the pose inside.
       for (const flipper of turtle.flippers) {
-        flipper.mesh.rotation.y = flipper.baseY + (flipper.side * 1.4 - flipper.baseY) * tuck;
+        flipper.mesh.rotation.y = flipper.baseY + ((flipper.boardingY ?? flipper.side * 1.4) - flipper.baseY) * tuck;
         flipper.mesh.rotation.z *= 1 - tuck;
+        flipper.mesh.rotation.x *= 1 - tuck;
       }
     }
     stepTurtleAnimation(rivalAnimation, rivalTurtle.visual, rivalTurtle.flippers, canDrive(race.phase) ? rival.speed : 0, dt, false);

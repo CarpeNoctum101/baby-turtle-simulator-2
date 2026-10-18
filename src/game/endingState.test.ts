@@ -15,6 +15,10 @@ describe("automatic Starship ending", () => {
       expect(Number.isFinite(frame.turtle.x + frame.turtle.y + frame.turtle.z + frame.heading)).toBe(true);
       expect(frame.altitude).toBeGreaterThanOrEqual(lastAltitude);
       expect(frame.turtle.z).toBeGreaterThanOrEqual(previousZ);
+      if (frame.phase === "walking") {
+        // The turtle and the deck stay above the ocean's highest animated wave (0.12).
+        expect(frame.turtle.y).toBeGreaterThan(0.12);
+      }
       if (frame.phase === "boarding") {
         expect(frame.turtle.x).toBe(0);
         expect(frame.turtle.y).toBe(endingPlan.hatch.y);
@@ -35,7 +39,10 @@ describe("automatic Starship ending", () => {
     for (let elapsed = 0; elapsed < endingPlan.riseSeconds; elapsed += 1 / 60) {
       const frame = sampleEnding({ ...state, elapsed });
       expect(frame.phase).toBe("rising");
-      expect(frame.turtle).toEqual(state.start);
+      expect(frame.turtle.x).toBe(state.start.x);
+      expect(frame.turtle.z).toBe(state.start.z);
+      // The final part of the lift carries the turtle smoothly onto the raised deck.
+      expect(frame.turtle.y).toBe(Math.max(state.start.y, endingPlan.entry.y + frame.platformOffset));
       expect(frame.heading).toBe(state.startHeading);
       expect(frame.speed).toBe(0);
       expect(frame.boarded).toBe(false);
@@ -49,7 +56,7 @@ describe("automatic Starship ending", () => {
     expect(ready.phase).toBe("walking");
     expect(ready.platformOffset).toBe(0);
     expect(ready.riseProgress).toBe(1);
-    expect(ready.turtle).toEqual(state.start);
+    expect(ready.turtle).toEqual({ ...state.start, y: endingPlan.entry.y });
     expect(ready.speed).toBe(endingPlan.walkingSpeed);
     expect(sampleEnding(state).platformOffset).toBe(-endingPlan.submergedDepth);
   });

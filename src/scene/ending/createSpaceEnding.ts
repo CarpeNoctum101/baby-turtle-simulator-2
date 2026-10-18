@@ -26,7 +26,7 @@ export function createSpaceEnding(scene: Scene, turtle: PlaceholderTurtle) {
   sea.isPickable=false;
   sea.setEnabled(false);
   const camera=new FreeCamera("endingCamera",new Vector3(16,13,5),scene);
-  camera.minZ=0.05;
+  camera.minZ=0.2;
   camera.maxZ=4000;
   camera.fov=0.8;
   const overlay=document.createElement("section");
@@ -79,7 +79,9 @@ export function createSpaceEnding(scene: Scene, turtle: PlaceholderTurtle) {
       meshStates=beachMeshes.map(mesh=>mesh.isEnabled());
       launch.root.setEnabled(true);backdrop.root.setEnabled(true);
       sea.setEnabled(true);
-      for(const mesh of beachMeshes)if(mesh.infiniteDistance || mesh.name==="previewOcean")mesh.setEnabled(false);
+      // Replace the race water, rather than drawing coplanar surfaces over one another.
+      for(const mesh of beachMeshes)if(mesh.infiniteDistance ||
+        ["previewOcean","shallowWater","finishZone"].includes(mesh.name))mesh.setEnabled(false);
       if(originalCamera)camera.position.copyFrom(originalCamera.globalPosition);
       target.copyFrom(turtle.root.position).addInPlace(new Vector3(0,0.45,0));
       scene.activeCamera=camera;

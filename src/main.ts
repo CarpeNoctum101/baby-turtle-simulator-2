@@ -62,13 +62,19 @@ if (!canvas || !ui) {
 }
 
 try {
-  const beachPreview = new URLSearchParams(window.location.search).get("beachPreview") === "1";
+  const params = new URLSearchParams(window.location.search);
+  const beachPreview = params.get("beachPreview") === "1";
+  const turtleModel = params.get("turtle") === "tmnt" ? "tmnt" : "ocean";
+  const assetCredit = document.querySelector<HTMLElement>(".asset-credit");
+  if (assetCredit) assetCredit.hidden = turtleModel === "tmnt";
   const previewLink = document.querySelector<HTMLAnchorElement>("#beachPreviewLink");
   if (beachPreview && previewLink) {
     previewLink.textContent = "Beach study · Back to course";
-    previewLink.href = "?";
+    previewLink.href = turtleModel === "tmnt" ? "?turtle=tmnt" : "?";
+  } else if (previewLink && turtleModel === "tmnt") {
+    previewLink.href = "?beachPreview=1&turtle=tmnt";
   }
-  const game = startGame(canvas, ui, beachPreview);
+  const game = startGame(canvas, ui, beachPreview, turtleModel);
 
   if (import.meta.hot) {
     import.meta.hot.dispose(() => {
