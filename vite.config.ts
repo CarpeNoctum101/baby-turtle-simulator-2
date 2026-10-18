@@ -4,7 +4,7 @@ export default defineConfig({
   // Babylon registers its shaders when those files load. Prebundling can split
   // that registration into a second copy, so the scene draws only the sky color.
   optimizeDeps: {
-    exclude: ["@babylonjs/core"],
+    exclude: ["@babylonjs/core", "@babylonjs/loaders"],
   },
   server: {
     port: 5173,

@@ -45,6 +45,13 @@
         <p>A second hatchling follows behind you. Sand Spray only catches a racer in the cloud behind your shell. The pale band at the shoreline is the wave zone.</p>
         <p>Watch for the seagull near the middle of the dry sand. It chases at a little under your speed, and a hit knocks you both back. If your health reaches zero it carries you back toward the nest.</p>
         <button id="startRace" type="button">Start race</button>
+        <p>Start race stays on this computer. An online room shares the countdown, Tide Orbs and finish order. The server decides places.</p>
+        <p>On one computer, set one window to Keyboard only and the other to Controller only.</p>
+        <label class="field">Name <input id="playerName" maxlength="16" value="Hatchling" autocomplete="nickname" /></label>
+        <button id="createRoom" type="button">Create online room</button>
+        <label class="field">Room code <input id="roomCode" maxlength="4" autocapitalize="characters" autocomplete="off" spellcheck="false" /></label>
+        <button id="joinRoom" type="button">Join online room</button>
+        <p id="onlineStatus" role="status"></p>
         <p class="credit">Seagull model by Bwinji Shamutete (Sketchfab), CC BY 4.0.</p>
       </div>
     </section>

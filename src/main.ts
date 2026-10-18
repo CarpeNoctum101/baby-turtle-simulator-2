@@ -75,7 +75,7 @@ const ui: GameUi | null =
   readyToggle &&
   startOnlineButton &&
   leaveRoomButton &&
-  inputDevices
+  inputDevices &&
   healthHud &&
   healthLabel &&
   healthFill &&

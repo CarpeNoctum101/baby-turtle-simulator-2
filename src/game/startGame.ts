@@ -3,18 +3,14 @@ import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Scene } from "@babylonjs/core/scene";
 import { applySandSlow, createEffects, isTrailVisible, resolveWaveWindow, speedModifiers, stepLoadout, type AbilityLoadout, type RacerEffects } from "../abilities/abilityState";
 import { abilityCatalog, raceAbilityPool, sandRules, shellRules, type AbilityId } from "../abilities/catalog";
-import { orbPickupRadius, tideOrbSpots, type TideOrb } from "../abilities/pickups";
-import { createSandCloud, stepSandClouds } from "../abilities/sandSpray";
-import { createEffects, isTrailVisible, speedModifiers } from "../abilities/abilityState";
 import { exhaustionScale } from "../abilities/health";
+import { orbPickupRadius, tideOrbSpots, type TideOrb } from "../abilities/pickups";
+import { createAbilityFx } from "../abilities/renderAbilityFx";
+import { createSandCloud, stepSandClouds } from "../abilities/sandSpray";
 import { lungeExtension } from "../abilities/snap";
 import { spinRules } from "../abilities/specials";
-import { abilityCatalog, raceAbilityPool } from "../abilities/catalog";
-import { createAbilityFx } from "../abilities/renderAbilityFx";
-import { stepAbilityWorld, createAbilityWorld, type AbilityCue, type AbilityWorld } from "../abilities/stepAbilityWorld";
+import { createAbilityWorld, stepAbilityWorld, type AbilityCue, type AbilityWorld } from "../abilities/stepAbilityWorld";
 import { createAbilityCues } from "../audio/abilityCues";
-import { createSeagullMobs } from "../mob/createSeagull";
-import { seagullSpawns } from "../mob/seagull";
 import { createFollowCamera, resetFollowCamera, updateFollowCamera } from "../camera/createThirdPersonCamera";
 import { abilityIcon } from "../hud/abilityIcon";
 import { formatAbilityHud, formatAbilityLine, formatPlace } from "../hud/formatAbilityHud";
@@ -27,7 +23,10 @@ import { createMouseLook } from "../input/createMouseLook";
 import { readKeyboard } from "../input/keyboard";
 import { pollGamepads } from "../input/pollGamepads";
 import { lookSource, stepLook, type LookOffsets } from "../input/stepLook";
-import { isInFinishZone, isInWaveZone, surfaceAt } from "../movement/course";
+import { clampToBeach, clampToCourse, isInFinishZone, isInWaveZone, surfaceAt } from "../movement/course";
+import { createTurtleMotion, planFromYaw, stepTurtle, type DriveInput, type TurtleMotion } from "../movement/stepTurtle";
+import { createSeagullMobs } from "../mob/createSeagull";
+import { seagullSpawns } from "../mob/seagull";
 import { compareResults, syncedRemaining } from "../../shared/raceFlow";
 import { slotPose } from "../../shared/roomState";
 import type { LoadoutMessage, PublicOrb, PublicPlayer, RoomPhase, Ticket } from "../../shared/protocol";
@@ -42,17 +41,15 @@ import {
   saveTicket,
 } from "../net/onlineClient";
 import { createRemoteTurtles } from "../net/remoteTurtles";
-import { clampToBeach, clampToCourse, isInFinishZone, isInWaveZone, surfaceAt } from "../movement/course";
-import { createTurtleMotion, planFromYaw, stepTurtle, type DriveInput, type TurtleMotion } from "../movement/stepTurtle";
 import { canDrive, countdownLabel, createRaceState, formatRaceTime, startCountdown, stepRace, type RaceState } from "../race/raceState";
 import { createRivalMotion, raceStanding, stepRival } from "../race/stepRival";
 import { createBeachScene } from "../scene/createBeachScene";
+import { createSpaceEnding } from "../scene/ending/createSpaceEnding";
 import { stepTurtleAnimation, type TurtleAnimation } from "../turtle/animateTurtle";
-import { createPlaceholderTurtle, type PlaceholderTurtle } from "../turtle/createPlaceholderTurtle";
 import { createDetailedTurtle } from "../turtle/createDetailedTurtle";
+import { createPlaceholderTurtle, type PlaceholderTurtle } from "../turtle/createPlaceholderTurtle";
 import { defaultTurtleType, scaleCrawl, turtleTypeList, turtleTypes, type TurtleTypeId } from "../turtle/turtleTypes";
 import { createEndingState, sampleEnding, stepEnding, type EndingPhase, type EndingState } from "./endingState";
-import { createSpaceEnding } from "../scene/ending/createSpaceEnding";
 
 export interface GameUi {
   hud: HTMLElement;
@@ -109,7 +106,8 @@ const inputChoiceKey = "baby-turtle-input";
 
 /**
  * Builds the beach once, then runs a single draw loop.
- * Starting again resets the turtle, the rival, the orbs, and any ability that was still running.
+ * A local race uses turtle types, health, specials and seagulls on this computer.
+ * An online race lets the server own the countdown, Tide Orbs, abilities and finish order.
  */
 export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = false): RunningGame {
   const engine = new Engine(canvas, true, { adaptToDeviceRatio: true });
@@ -156,6 +154,8 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
   const heldEdges = new Set<string>();
   let online = false;
 
+  const freshWorld = () => createAbilityWorld(turtleType.maxHealth, seagullSpawns);
+
   const placeTurtle = (body: PlaceholderTurtle, next: TurtleMotion, lift = 0) => {
     body.root.position.set(next.x, lift, next.z);
     body.root.rotation.y = next.heading;
@@ -177,7 +177,7 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     picker.replaceChildren();
     const onPick = (event: Event) => {
       const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-turtle-type]");
-      if (button && (race.phase === "ready" || race.phase === "finished")) {
+      if (button && !online && (race.phase === "ready" || race.phase === "finished")) {
         applyTurtleType(button.dataset.turtleType as TurtleTypeId);
       }
     };
@@ -197,6 +197,17 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
   });
   applyTurtleType(defaultTurtleType);
 
+  const resetCombat = () => {
+    world = freshWorld();
+    rescuing = false;
+    controlsLocked = false;
+    spinAngle = 0;
+    playerLift = 0;
+    lastHealth = world.playerHealth.current;
+    hurtFlash = 0;
+    blockFlash = 0;
+  };
+
   const restartRace = () => {
     spaceEnding.reset();
     ending = null;
@@ -205,14 +216,7 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     look = { ...initialLook };
     resetFollowCamera(camera);
     race = startCountdown(race);
-    world = createAbilityWorld(turtleType.maxHealth, seagullSpawns);
-    rescuing = false;
-    controlsLocked = false;
-    spinAngle = 0;
-    playerLift = 0;
-    lastHealth = world.playerHealth.current;
-    hurtFlash = 0;
-    blockFlash = 0;
+    resetCombat();
     animation.phase = 0;
     rivalAnimation.phase = 0;
     setHudVisible(!beachPreview);
@@ -319,7 +323,7 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     placeTurtle(turtle, motion);
     ending = null;
     spaceEnding.reset();
-    world = createAbilityWorld();
+    resetCombat();
     selfPlace = 0;
     selfMs = 0;
     finishAttemptAt = 0;
@@ -397,7 +401,7 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     motion = createTurtleMotion();
     rival = createRivalMotion(motion);
     race = createRaceState();
-    world = createAbilityWorld();
+    resetCombat();
     placeTurtle(turtle, motion);
     placeTurtle(rivalTurtle, rival);
     ui.onlineStatus.textContent = status;
@@ -423,6 +427,9 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     motion = { x: ticket.x, z: ticket.z, heading: ticket.heading, speed: 0, steer: 0 };
     placeTurtle(turtle, motion);
     rivalTurtle.root.setEnabled(false);
+    ending = null;
+    spaceEnding.reset();
+    resetCombat();
     ui.onlineStatus.textContent = `Joining room ${ticket.roomCode}…`;
     session?.drop();
     session = new OnlineSession({
@@ -728,14 +735,12 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     const limited = limitInput(inputChoice, readKeyboard(keyboard.keys), gamepad);
     const movement = combineMovement(limited.keyboard, limited.gamepad);
     const canOnlineDrive = onlinePhase === "lobby" || (onlinePhase === "racing" && selfPlace === 0);
-    const drive = !ending && (online ? canOnlineDrive : canDrive(race.phase)) ? movement : idleDrive;
+    const localDrive = canDrive(race.phase) && !controlsLocked;
+    const drive = !ending && (online ? canOnlineDrive : localDrive) ? movement : idleDrive;
     const abilityDown = (inputChoice !== "gamepad" && keyboard.keys.has("KeyX")) || limited.gamepad.ability;
-    const movement = combineMovement(readKeyboard(keyboard.keys), gamepad);
-    const drive = canDrive(race.phase) && !controlsLocked ? movement : idleDrive;
-    const abilityDown = keyboard.keys.has("KeyX") || gamepad.ability;
     const activate = abilityDown && !abilityWasDown;
     abilityWasDown = abilityDown;
-    const specialDown = keyboard.keys.has("KeyE") || gamepad.snap;
+    const specialDown = (inputChoice !== "gamepad" && keyboard.keys.has("KeyE")) || limited.gamepad.snap;
     const specialPressed = specialDown && !specialWasDown;
     specialWasDown = specialDown;
     if (ending) {
@@ -786,14 +791,12 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     }
 
     if (!online && (race.phase === "racing" || race.phase === "countdown")) {
-      motion = stepTurtle(motion, drive, dt, planFromYaw(look.yaw), speedModifiers(world.loadout.effects));
-    if (race.phase === "racing" || race.phase === "countdown") {
       const playerPace = turtleType.speedScale * exhaustionScale(world.playerHealth);
       motion = stepTurtle(motion, drive, dt, planFromYaw(look.yaw), scaleCrawl(speedModifiers(world.loadout.effects), playerPace));
       motion = {
         ...motion,
-        x: clampToBeach(motion.x + (shift.x)),
-        z: clampToCourse(motion.z + (shift.z)),
+        x: clampToBeach(motion.x + shift.x),
+        z: clampToCourse(motion.z + shift.z),
       };
       if (race.phase === "racing") {
         rival = stepRival(rival, motion, dt, scaleCrawl(speedModifiers(world.rivalEffects), exhaustionScale(world.rivalHealth)));
@@ -872,8 +875,7 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
       }
       remotes.step(dt);
     }
-    const playerSpeed = endingFrame?.speed ?? (online || canDrive(race.phase) ? motion.speed : 0);
-    const playerSpeed = endingFrame?.speed ?? (rescuing ? 4 : canDrive(race.phase) ? motion.speed : 0);
+    const playerSpeed = endingFrame?.speed ?? (rescuing ? 4 : online || canDrive(race.phase) ? motion.speed : 0);
     // Kempy's shell whirls while the spin dash is on, then snaps back to facing forward.
     const spinning = !endingFrame && world.loadout.effects.spinRemaining > 0;
     spinAngle = spinning ? spinAngle + spinRules.turnsPerSecond * Math.PI * 2 * dt : 0;
@@ -916,15 +918,13 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
       : raceStanding(motion.z, rival.z);
     const abilityView = formatAbilityHud({
       held: world.loadout.held,
-      spare: world.loadout.spare,
+      spare: online ? null : world.loadout.spare,
       effects: world.loadout.effects,
     });
     syncAbilityHud(ui, abilityView);
+    syncHealthHud(ui, world, turtleType, hurtFlash > 0, online);
     syncRaceUi(ui, race, hudVisible, standing, endingFrame?.phase ?? null, online);
     const readout = formatHud({
-    syncHealthHud(ui, world, turtleType, hurtFlash > 0);
-    syncRaceUi(ui, race, hudVisible, standing, endingFrame?.phase ?? null);
-    ui.hud.textContent = formatHud({
       phase: race.phase,
       elapsed: race.elapsed,
       finishTime: race.finishTime,
@@ -1027,11 +1027,9 @@ function syncRaceUi(
   ui.hud.hidden = menuOpen || cinematic || !hudVisible;
   ui.hudToggle.hidden = menuOpen || cinematic;
   ui.abilityHud.hidden = menuOpen || cinematic || (onlineMode && race.phase !== "racing");
+  ui.healthHud.hidden = menuOpen || cinematic || onlineMode;
   ui.startScreen.hidden = onlineMode || race.phase !== "ready";
   ui.lobbyBar.hidden = !onlineMode;
-  ui.abilityHud.hidden = menuOpen || cinematic;
-  ui.healthHud.hidden = menuOpen || cinematic;
-  ui.startScreen.hidden = race.phase !== "ready";
   ui.results.hidden = race.phase !== "finished" || cinematic;
   const label = countdownLabel(race);
   ui.countdown.hidden = label === null;
@@ -1080,7 +1078,9 @@ function applyServerLoadout(loadout: AbilityLoadout, message: LoadoutMessage, se
   effects.waveWindowRemaining = message.active === "wave-rider" ? remaining : 0;
   effects.trailRemaining = message.active === "magnetic-sense" ? remaining : 0;
   effects.slowRemaining = message.slowUntil > serverNow ? (message.slowUntil - serverNow) / 1000 : 0;
-  return { held: message.held, effects };
+  effects.spinRemaining = 0;
+  effects.stunRemaining = 0;
+  return { held: message.held, spare: null, effects };
 }
 
 function showServerAbility(loadout: AbilityLoadout, ability: AbilityId, remaining: number): AbilityLoadout {
@@ -1092,7 +1092,9 @@ function showServerAbility(loadout: AbilityLoadout, ability: AbilityId, remainin
   effects.sprayRemaining = ability === "sand-spray" ? seconds : 0;
   effects.waveWindowRemaining = ability === "wave-rider" ? seconds : 0;
   effects.trailRemaining = ability === "magnetic-sense" ? seconds : 0;
-  return { held: null, effects };
+  effects.spinRemaining = 0;
+  effects.stunRemaining = 0;
+  return { held: null, spare: null, effects };
 }
 
 function cueForAbility(ability: AbilityId): AbilityCue {
@@ -1111,7 +1113,13 @@ function cueForAbility(ability: AbilityId): AbilityCue {
   return "trail";
 }
 
-function syncHealthHud(ui: GameUi, world: AbilityWorld, type: (typeof turtleTypes)[TurtleTypeId], hurt: boolean): void {
+function syncHealthHud(
+  ui: GameUi,
+  world: AbilityWorld,
+  type: (typeof turtleTypes)[TurtleTypeId],
+  hurt: boolean,
+  onlineMode: boolean,
+): void {
   const player = formatHealth(world.playerHealth, type.name);
   ui.healthLabel.textContent = player.label;
   ui.healthFill.style.width = `${player.fraction * 100}%`;
@@ -1121,14 +1129,14 @@ function syncHealthHud(ui: GameUi, world: AbilityWorld, type: (typeof turtleType
   ui.rivalHealthLabel.textContent = rival.label;
   ui.rivalHealthFill.style.width = `${rival.fraction * 100}%`;
 
-  ui.abilitySpare.hidden = type.itemSlots < 2;
-  const spare = world.loadout.spare;
+  ui.abilitySpare.hidden = onlineMode || type.itemSlots < 2;
+  const spare = onlineMode ? null : world.loadout.spare;
   ui.abilitySpare.dataset.ability = spare ?? "empty";
   ui.abilitySpare.setAttribute("aria-label", spare ? `Next: ${abilityCatalog[spare].name}` : "Second slot empty");
   ui.abilitySpareIcon.innerHTML = spare ? abilityIcon(spare) : "";
 
-  ui.snapHud.hidden = type.special === null;
-  if (type.special) {
+  ui.snapHud.hidden = onlineMode || type.special === null;
+  if (!onlineMode && type.special) {
     const special = formatSpecial({
       kind: type.special,
       snap: world.snap,
