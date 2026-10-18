@@ -40,7 +40,7 @@ export function createBeachPreview(scene: Scene, sun: DirectionalLight, fill: He
   createAtmosphere(scene, sunDirection);
 
   // Replace only the preview's visual blocks. Logical surface/finish coordinates stay intact.
-  for (const name of ["surroundingSand", "drySand", "wetSand", "shallowWater", "finishZone", "rightBerm", "leftBerm", "nest", "startPad-left", "startPad-center", "startPad-right"]) {
+  for (const name of ["surroundingSand", "drySand", "wetSand", "shallowWater", "finishZone", "rightBerm", "leftBerm", "nest", "startPad-left", "startPad-center", "startPad-right", "startLine"]) {
     scene.getMeshByName(name)?.setEnabled(false);
   }
   for (const mesh of scene.meshes) if (mesh.name.startsWith("pebble")) mesh.setEnabled(false);

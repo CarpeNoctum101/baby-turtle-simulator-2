@@ -238,7 +238,8 @@ describe("stunned seagull", () => {
   });
 
   it("puts several gulls along the course, apart from each other", () => {
-    expect(seagullSpawns.length).toBeGreaterThanOrEqual(3);
+    expect(seagullSpawns.length).toBeGreaterThanOrEqual(2);
+    expect(seagullSpawns.every((spawn) => spawn.flier)).toBe(true);
     expect(new Set(seagullSpawns.map((spawn) => spawn.id)).size).toBe(seagullSpawns.length);
     for (const a of seagullSpawns) {
       for (const b of seagullSpawns) {
@@ -341,9 +342,9 @@ describe("flying seagull", () => {
     expect(bitten.world.seagulls[0]!.phase).toBe("stunned");
   });
 
-  it("makes two of the four game gulls fliers", () => {
-    expect(seagullSpawns.filter((spawn) => spawn.flier).length).toBe(2);
-    expect(seagullSpawns.length).toBe(4);
+  it("keeps the flying gulls and leaves the ground gulls out for now", () => {
+    expect(seagullSpawns.filter((spawn) => spawn.flier).length).toBe(seagullSpawns.length);
+    expect(seagullSpawns.map((spawn) => spawn.id)).toEqual(["gull-2", "gull-4"]);
   });
 });
 

@@ -4,14 +4,22 @@
  * These are separate from the small debris piles, which still only apply a collision penalty.
  */
 export const obstacleLayout = [
-  { id: "rock-left-nest", kind: "rock" as const, x: -6.8, z: -20, radius: 1.1, length: 0, yaw: 0 },
-  { id: "rock-right-nest", kind: "rock" as const, x: 6.5, z: -18, radius: 1.25, length: 0, yaw: 0 },
-  { id: "log-dry", kind: "log" as const, x: 0, z: -12, radius: 0.5, length: 3.4, yaw: 1.2 },
-  { id: "rock-left-mid", kind: "rock" as const, x: -7.2, z: 2, radius: 1.4, length: 0, yaw: 0 },
-  { id: "rock-right-mid", kind: "rock" as const, x: 7.5, z: 12, radius: 1.3, length: 0, yaw: 0 },
-  { id: "rock-wet", kind: "rock" as const, x: 2.2, z: 16, radius: 1.15, length: 0, yaw: 0 },
-  { id: "log-shore", kind: "log" as const, x: -7, z: 26, radius: 0.55, length: 3.2, yaw: 0.3 },
-  { id: "rock-water", kind: "rock" as const, x: 6.8, z: 36, radius: 1.35, length: 0, yaw: 0 },
+  { id: "rock-back-left", kind: "rock" as const, x: -11, z: -30, radius: 1.25, length: 0, yaw: 0 },
+  { id: "rock-back-right", kind: "rock" as const, x: 10.5, z: -28, radius: 1.15, length: 0, yaw: 0 },
+  { id: "rock-left-nest", kind: "rock" as const, x: -12, z: -18, radius: 1.3, length: 0, yaw: 0 },
+  { id: "rock-right-nest", kind: "rock" as const, x: 12, z: -16, radius: 1.2, length: 0, yaw: 0 },
+  { id: "log-dry", kind: "log" as const, x: 1.2, z: -8, radius: 0.55, length: 4.2, yaw: 0.95 },
+  { id: "rock-dry-left", kind: "rock" as const, x: -11, z: -1, radius: 1.4, length: 0, yaw: 0 },
+  { id: "rock-dry-right", kind: "rock" as const, x: 12, z: 8, radius: 1.25, length: 0, yaw: 0 },
+  { id: "log-mid", kind: "log" as const, x: -1, z: 14, radius: 0.5, length: 3.8, yaw: 1.25 },
+  { id: "rock-wet-left", kind: "rock" as const, x: -12.5, z: 22, radius: 1.45, length: 0, yaw: 0 },
+  { id: "rock-wet", kind: "rock" as const, x: 10, z: 30, radius: 1.2, length: 0, yaw: 0 },
+  { id: "log-shore", kind: "log" as const, x: 1.5, z: 34, radius: 0.55, length: 4, yaw: 0.4 },
+  { id: "rock-shore-left", kind: "rock" as const, x: -9, z: 44, radius: 1.35, length: 0, yaw: 0 },
+  { id: "log-water", kind: "log" as const, x: 3, z: 50, radius: 0.5, length: 3.6, yaw: 1.05 },
+  { id: "rock-water", kind: "rock" as const, x: 12, z: 56, radius: 1.4, length: 0, yaw: 0 },
+  { id: "rock-water-left", kind: "rock" as const, x: -12, z: 60, radius: 1.25, length: 0, yaw: 0 },
+  { id: "log-late", kind: "log" as const, x: -2, z: 64, radius: 0.5, length: 3.4, yaw: 0.35 },
 ];
 
 export type CourseObstacle = (typeof obstacleLayout)[number];

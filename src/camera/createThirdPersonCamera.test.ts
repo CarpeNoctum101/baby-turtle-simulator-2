@@ -2,7 +2,7 @@ import { NullEngine } from "@babylonjs/core/Engines/nullEngine";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Scene } from "@babylonjs/core/scene";
 import { describe, expect, it } from "vitest";
-import { aimThroughCrosshair, createFollowCamera, updateFollowCamera } from "./createThirdPersonCamera";
+import { aimThroughCrosshair, createFollowCamera, frameTitleShot, updateFollowCamera } from "./createThirdPersonCamera";
 
 function groundForward(scene: Scene) {
   const camera = scene.activeCamera;
@@ -68,6 +68,24 @@ describe("follow camera", () => {
     expect(level.z).toBeGreaterThan(0.8);
     expect(level.y).toBeLessThan(0);
     expect(raised.y).toBeGreaterThan(level.y);
+
+    rig.dispose();
+    scene.dispose();
+    engine.dispose();
+  });
+
+  it("frames the title wider than the race camera and keeps the race zoom", () => {
+    const engine = new NullEngine();
+    const scene = new Scene(engine);
+    const rig = createFollowCamera(scene);
+    const raceRadius = rig.radius;
+
+    frameTitleShot(rig, 0, -24);
+
+    expect(rig.camera.radius).toBeGreaterThan(raceRadius);
+    expect(rig.radius).toBe(raceRadius);
+    expect(rig.target.z).toBeGreaterThan(-24);
+    expect(rig.target.x).toBeCloseTo(0, 5);
 
     rig.dispose();
     scene.dispose();

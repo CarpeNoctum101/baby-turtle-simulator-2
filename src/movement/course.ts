@@ -5,19 +5,19 @@ import { surfaces, type SurfaceProfile } from "./surfaces";
  * Dry sand, wet sand, then shallow water lead to a finish gate.
  */
 export const course = {
-  halfWidth: 12,
+  halfWidth: 16,
   nest: { x: 0, z: -24 },
-  dry: { minZ: -32, maxZ: 14 },
-  wet: { minZ: 14, maxZ: 32 },
-  water: { minZ: 32, maxZ: 52 },
-  finish: { minZ: 52, maxZ: 60 },
+  dry: { minZ: -36, maxZ: 18 },
+  wet: { minZ: 18, maxZ: 40 },
+  water: { minZ: 40, maxZ: 66 },
+  finish: { minZ: 66, maxZ: 76 },
 };
 
 /** Three pads at the nest. The player uses the center pad. */
 export const startingGrid = [
-  { id: "left", x: -3.2, z: course.nest.z },
+  { id: "left", x: -4.6, z: course.nest.z },
   { id: "center", x: course.nest.x, z: course.nest.z },
-  { id: "right", x: 3.2, z: course.nest.z },
+  { id: "right", x: 4.6, z: course.nest.z },
 ] as const;
 
 export const playerStart = startingGrid[1];

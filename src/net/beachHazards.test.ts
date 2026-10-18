@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { bubbleRules } from "../abilities/bubble";
+import { seagullSpawns } from "../mob/seagull";
 import { bubbleShotRules } from "../abilities/catalog";
 import {
   armBubbleGun,
@@ -28,7 +29,12 @@ function run(players: BeachPlayer[], seconds: number) {
 
 describe("shared beach hazards", () => {
   it("lets each seagull lock a different turtle when both are in reach", () => {
-    const hazards = run([player("a", -1.25, -2), player("b", -1.25, -2)], 0.4);
+    const [first, second] = seagullSpawns;
+    if (!first || !second) throw new Error("expected two flying gulls");
+    const hazards = run([
+      player("a", first.home.x, first.home.z),
+      player("b", second.home.x, second.home.z),
+    ], 0.4);
     const targets = hazards.seagulls.map((gull) => gull.targetId).filter((id): id is string => id !== null);
     expect(targets.length).toBeGreaterThan(1);
     expect(new Set(targets).size).toBe(targets.length);

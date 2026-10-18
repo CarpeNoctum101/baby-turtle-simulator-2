@@ -4,6 +4,11 @@
  */
 export const controlSettings = {
   stickDeadZone: 0.18,
+  /**
+   * The right stick never uses a smaller dead zone than this.
+   * A resting stick often reports a little bias on both axes, and that bias was turning the camera.
+   */
+  lookDeadZoneFloor: 0.28,
   mouseYawSensitivity: 0.0032,
   mousePitchSensitivity: 0.0022,
   stickLookYawRate: 1.7,

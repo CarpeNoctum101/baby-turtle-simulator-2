@@ -1,9 +1,21 @@
+:root {
+  --sand: #f7f1e4;
+  --sand-deep: #efe4cf;
+  --ink: #173036;
+  --ocean: #1f6f68;
+  --ocean-deep: #164e4a;
+  --sunrise: #e3914a;
+  --foam: #f4fffc;
+  --danger: #8d3b32;
+}
+
 html,
 body {
   margin: 0;
   height: 100%;
   overflow: hidden;
   background: #93c0e0;
+  color: var(--ink);
   font-family: "Segoe UI", system-ui, sans-serif;
 }
 
@@ -70,26 +82,26 @@ body {
 
 #hudToggle {
   position: absolute;
-  top: 12px;
+  bottom: 16px;
   left: 12px;
-  z-index: 2;
+  z-index: 4;
   margin: 0;
   padding: 6px 10px;
   border: 0;
-  border-radius: 8px;
-  color: #1c2618;
-  background: rgba(255, 248, 230, 0.92);
-  font: 13px "Segoe UI", system-ui, sans-serif;
+  border-radius: 999px;
+  color: var(--foam);
+  background: rgba(20, 40, 44, 0.55);
+  font: 12px "Segoe UI", system-ui, sans-serif;
   cursor: pointer;
 }
 
 #hudToggle:hover {
-  background: #fff8e6;
+  background: rgba(20, 40, 44, 0.78);
 }
 
 #hud {
   position: absolute;
-  top: 48px;
+  top: 124px;
   left: 12px;
   z-index: 2;
   max-width: min(42rem, calc(100% - 24px));
@@ -113,7 +125,10 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(18, 32, 42, 0.35);
+  overflow: auto;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(227, 145, 74, 0.28), transparent 42%),
+    linear-gradient(180deg, rgba(18, 42, 52, 0.25), rgba(10, 28, 36, 0.55));
 }
 
 .overlay[hidden] {
@@ -123,10 +138,13 @@ body {
 .panel {
   width: min(28rem, calc(100% - 32px));
   margin: 0;
-  padding: 24px 22px;
-  border-radius: 14px;
-  color: #1c2618;
-  background: rgba(255, 248, 230, 0.96);
+  padding: 28px 26px 22px;
+  border: 1px solid rgba(255, 248, 230, 0.72);
+  border-radius: 22px;
+  color: var(--ink);
+  background:
+    linear-gradient(180deg, rgba(255, 251, 244, 0.97), rgba(244, 236, 220, 0.96));
+  box-shadow: 0 24px 60px rgba(12, 28, 32, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.85);
   text-align: center;
 }
 
@@ -136,8 +154,22 @@ body {
   margin: 0 0 12px;
 }
 
+.panel h1,
+.panel h2 {
+  font-family: Georgia, "Palatino Linotype", Palatino, serif;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: #14343a;
+}
+
+.panel h1 {
+  font-size: clamp(2rem, 4vw, 2.7rem);
+  line-height: 0.95;
+}
+
 .panel button,
-#hudToggle {
+#hudToggle,
+#settingsButton {
   border: 0;
   border-radius: 8px;
   cursor: pointer;
@@ -146,14 +178,46 @@ body {
 .panel button {
   margin-top: 8px;
   padding: 10px 18px;
-  color: #f7f3e6;
-  background: #2f6f62;
-  font: 16px "Segoe UI", system-ui, sans-serif;
+  color: var(--foam);
+  background: var(--ocean);
+  font: 600 16px "Segoe UI", system-ui, sans-serif;
+}
+
+.panel button:hover {
+  background: var(--ocean-deep);
 }
 
 .panel button:disabled {
   opacity: 0.6;
   cursor: wait;
+}
+
+.panel button.primary {
+  width: 100%;
+  margin-top: 4px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #2a8a80, var(--ocean-deep));
+  box-shadow: 0 10px 20px rgba(22, 78, 74, 0.22);
+  font-size: 18px;
+}
+
+.panel button.ghost {
+  color: var(--ink);
+  background: transparent;
+  box-shadow: inset 0 0 0 1px rgba(23, 48, 54, 0.2);
+}
+
+.panel button.ghost:hover {
+  background: rgba(23, 48, 54, 0.06);
+}
+
+.panel button.danger {
+  background: var(--danger);
+}
+
+.panel button.danger:hover {
+  background: #732f28;
 }
 
 .field {
@@ -186,15 +250,18 @@ body {
 
 #lobbyBar {
   position: absolute;
-  top: 12px;
+  top: 60px;
   right: 12px;
   z-index: 4;
-  width: min(22rem, calc(100% - 24px));
+  width: min(20rem, calc(100vw - 250px));
   margin: 0;
-  padding: 10px 12px;
-  border-radius: 8px;
-  color: #1c2618;
-  background: rgba(255, 248, 230, 0.94);
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 248, 230, 0.45);
+  border-radius: 16px;
+  color: var(--foam);
+  background: rgba(18, 40, 44, 0.78);
+  box-shadow: 0 12px 28px rgba(12, 24, 28, 0.2);
+  backdrop-filter: blur(8px);
 }
 
 #lobbyBar[hidden] {
@@ -210,6 +277,17 @@ body {
 #lobbyBar button {
   margin-top: 8px;
   margin-right: 8px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 999px;
+  color: #14343a;
+  background: var(--sand);
+  font: 600 13px "Segoe UI", system-ui, sans-serif;
+  cursor: pointer;
+}
+
+#lobbyBar button:hover {
+  background: #fff8ea;
 }
 
 #lobbyBar button:disabled {
@@ -228,44 +306,29 @@ body {
 }
 
 #inputChoice {
-  position: absolute;
-  left: 12px;
-  bottom: 16px;
-  z-index: 6;
-  margin: 0;
-  padding: 8px 10px;
-  border: 0;
-  border-radius: 8px;
-  color: #1c2618;
-  background: rgba(255, 248, 230, 0.94);
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(23, 48, 54, 0.12);
+  border-radius: 14px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.45);
+  text-align: left;
 }
 
 #inputChoice legend {
   padding: 0 4px;
   font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 #inputChoice label {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-#leaveRoom {
-  margin-top: 8px;
-  padding: 6px 10px;
-  border: 0;
-  border-radius: 8px;
-  color: #f7f3e6;
-  background: #2f6f62;
-  font: 13px "Segoe UI", system-ui, sans-serif;
-  cursor: pointer;
-}
-
-.panel button:hover {
-  background: #275c51;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.7;
 }
 
 #countdown,
@@ -456,16 +519,17 @@ body {
 body:has(.ending-overlay:not([hidden])) #beachPreviewLink,
 body:has(.ending-overlay:not([hidden])) #hudToggle,
 body:has(.ending-overlay:not([hidden])) #hud,
-body:has(.ending-overlay:not([hidden])) #inputChoice { display: none; }
+body:has(.ending-overlay:not([hidden])) #settingsButton,
+body:has(.ending-overlay:not([hidden])) #settingsMenu { display: none; }
 body:has(#results:not([hidden])) .ending-overlay { display: none; }
 body:has(.overlay:not([hidden])) #beachPreviewLink { display: none; }
 
 #healthHud {
   position: absolute;
   top: 16px;
-  right: 16px;
-  z-index: 4;
-  width: 200px;
+  left: 16px;
+  z-index: 8;
+  width: min(200px, calc(100vw - 250px));
   padding: 8px 12px 10px;
   border-radius: 12px;
   color: #f7f3e6;
@@ -604,6 +668,10 @@ body:has(.overlay:not([hidden])) #beachPreviewLink { display: none; }
   background: rgba(47, 111, 98, 0.3);
 }
 
+.panel .typePicker button:hover {
+  background: rgba(47, 111, 98, 0.22);
+}
+
 .panel .credit {
   margin: 12px 0 0;
   font-size: 11px;
@@ -629,3 +697,300 @@ body:has(.overlay:not([hidden])) #beachPreviewLink { display: none; }
 }
 
 #netStatus[hidden] { display: none; }
+
+.menu-overlay {
+  align-items: flex-start;
+  padding: 64px 16px 40px;
+}
+
+#startScreen.front-door {
+  background: linear-gradient(to bottom, rgba(8, 22, 30, 0.5), rgba(8, 22, 30, 0) 28%);
+  align-items: flex-start;
+  justify-content: center;
+  padding: 4vh 20px 0;
+}
+
+#startScreen.front-door[data-step="home"]:not([hidden]) ~ #settingsButton {
+  display: none;
+}
+
+#startScreen.front-door[data-step="mode"],
+#startScreen.front-door[data-step="setup"] {
+  align-items: center;
+  padding: 24px 16px;
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(8, 22, 30, 0.18), rgba(8, 22, 30, 0.42));
+}
+
+/* A tall card centered in a flex overlay gets its top clipped. Start at the top so it can scroll. */
+#startScreen.front-door[data-step="setup"] {
+  align-items: flex-start;
+  padding: 16px 16px 24px;
+}
+
+.home-card {
+  width: min(40rem, 100%);
+  text-align: center;
+  pointer-events: auto;
+}
+
+.home-card h1 {
+  margin: 0 0 12px;
+  color: #fff8ea;
+  font-family: Georgia, "Palatino Linotype", Palatino, serif;
+  font-size: clamp(2.6rem, 7vw, 5rem);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 0.95;
+  text-shadow: 0 8px 28px rgba(8, 20, 28, 0.55);
+}
+
+#playButton {
+  min-width: 220px;
+  width: auto;
+  margin: 0;
+  padding: 14px 42px;
+  border: 0;
+  border-radius: 999px;
+  color: #f4fffc;
+  background: linear-gradient(180deg, #2a8a80, #164e4a);
+  box-shadow: 0 12px 28px rgba(8, 20, 28, 0.28);
+  font: 600 20px "Segoe UI", system-ui, sans-serif;
+  cursor: pointer;
+}
+
+#playButton:hover {
+  background: #123f3b;
+}
+
+.mode-card,
+.setup-card {
+  width: min(26rem, calc(100% - 8px));
+  text-align: left;
+}
+
+.setup-card {
+  margin: 0 auto;
+  padding: 14px 16px 12px;
+}
+
+.setup-card .typePicker {
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.setup-card .typePicker button {
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+.setup-card .typePicker button small {
+  font-size: 10px;
+}
+
+.setup-card .field {
+  margin-top: 6px;
+}
+
+.setup-card .hint {
+  margin-bottom: 0;
+  font-size: 13px;
+}
+
+.setup-card .primary {
+  padding: 11px 16px;
+}
+
+.mode-card .primary,
+.setup-card .primary,
+#joinSetup .primary {
+  width: 100%;
+}
+
+#joinSetup {
+  margin-top: 8px;
+}
+
+.menu-card {
+  width: min(58rem, calc(100% - 8px));
+  text-align: left;
+}
+
+.menu-hero {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.shell-mark {
+  flex: 0 0 auto;
+  width: 58px;
+  height: 46px;
+  border-radius: 50% 50% 46% 46%;
+  background:
+    radial-gradient(circle at 50% 58%, rgba(255, 248, 230, 0.28) 0 6px, transparent 7px),
+    repeating-linear-gradient(90deg, transparent 0 12px, rgba(255, 248, 230, 0.35) 12px 14px),
+    linear-gradient(165deg, #49a898, #174e49);
+  box-shadow: inset 0 -8px 0 rgba(0, 0, 0, 0.14), 0 8px 16px rgba(20, 60, 56, 0.18);
+}
+
+.eyebrow,
+.section-label {
+  margin: 0 0 6px;
+  color: var(--ocean-deep);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tagline,
+.hint {
+  margin: 0;
+  color: #3d534f;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.menu-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.online-box,
+.how-to {
+  margin-top: 16px;
+  padding: 14px 14px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(23, 48, 54, 0.08);
+}
+
+.how-to {
+  margin-top: 0;
+}
+
+.tips {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tips li {
+  margin: 0 0 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(23, 48, 54, 0.08);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.tips li:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.tips strong {
+  display: inline-block;
+  min-width: 5.2rem;
+  color: #14343a;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.button-row button {
+  flex: 1 1 auto;
+}
+
+.settings-overlay {
+  z-index: 9;
+  align-items: center;
+  padding: 24px 16px;
+  background: rgba(10, 26, 32, 0.62);
+}
+
+.settings-card {
+  width: min(26rem, calc(100% - 8px));
+  text-align: left;
+}
+
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.settings-actions button {
+  flex: 1 1 8rem;
+  margin-top: 0;
+}
+
+#settingsButton {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 8;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  padding: 0;
+  border-radius: 999px;
+  color: #14343a;
+  background: rgba(255, 248, 230, 0.94);
+  box-shadow: 0 8px 18px rgba(16, 32, 28, 0.18);
+}
+
+#settingsButton svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+
+#settingsButton:hover,
+#settingsButton[aria-expanded="true"] {
+  background: #fff8e6;
+  color: var(--ocean-deep);
+}
+
+#settingsButton[hidden] {
+  display: none;
+}
+
+#results.menu-overlay {
+  align-items: center;
+}
+
+#results .panel {
+  text-align: center;
+}
+
+#results .typePicker {
+  text-align: left;
+}
+
+@media (max-width: 860px) {
+  .menu-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .how-to {
+    margin-top: 4px;
+  }
+
+  #healthHud {
+    width: min(168px, 46vw);
+  }
+
+  #raceTimer {
+    font-size: 22px;
+  }
+}

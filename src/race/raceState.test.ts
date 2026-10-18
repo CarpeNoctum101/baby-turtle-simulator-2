@@ -16,7 +16,7 @@ function advance(state: ReturnType<typeof createRaceState>, seconds: number, rea
 describe("race flow", () => {
   it("puts the player on the center pad, with the other pads beside the nest", () => {
     expect(playerStart).toEqual({ id: "center", x: 0, z: course.nest.z });
-    expect(startingGrid.map((spot) => spot.x)).toEqual([-3.2, 0, 3.2]);
+    expect(startingGrid.map((spot) => spot.x)).toEqual([-4.6, 0, 4.6]);
     for (const spot of startingGrid) {
       expect(Math.abs(spot.x)).toBeLessThan(course.halfWidth);
       expect(spot.z).toBe(course.nest.z);

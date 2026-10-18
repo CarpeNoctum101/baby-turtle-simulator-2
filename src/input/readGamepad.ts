@@ -24,6 +24,8 @@ export interface GamepadReading {
   snap: boolean;
   /** Standard pads report RT. Other layouts leave this false. */
   shoot: boolean;
+  /** Standard pads report the Menu button. Other layouts leave this false. */
+  menu: boolean;
   pressedButtons: PressedButton[];
   axes: number[];
 }
@@ -42,11 +44,17 @@ export const emptyGamepadReading: GamepadReading = {
   ability: false,
   snap: false,
   shoot: false,
+  menu: false,
   pressedButtons: [],
   axes: [],
 };
 
-export function readGamepadSnapshot(snapshot: GamepadSnapshot, deadZone: number, padCount = 1): GamepadReading {
+export function readGamepadSnapshot(
+  snapshot: GamepadSnapshot,
+  deadZone: number,
+  padCount = 1,
+  lookDeadZone = deadZone,
+): GamepadReading {
   const stickMapping = mappingForGamepad(snapshot.mapping);
   const brakeButton = stickMapping.brakeButton;
   const abilityButton = stickMapping.abilityButton;
@@ -54,19 +62,22 @@ export function readGamepadSnapshot(snapshot: GamepadSnapshot, deadZone: number,
   const ability = abilityButton !== null && snapshot.buttons[abilityButton]?.pressed === true;
   const snap = stickMapping.snapButton !== null && snapshot.buttons[stickMapping.snapButton]?.pressed === true;
   const shoot = stickMapping.shootButton !== null && snapshot.buttons[stickMapping.shootButton]?.pressed === true;
+  const menu = stickMapping.menuButton !== null && snapshot.buttons[stickMapping.menuButton]?.pressed === true;
   const move = shapeStick(
     axis(snapshot.axes, stickMapping.steerAxis),
     axis(snapshot.axes, stickMapping.throttleAxis),
     deadZone,
     false,
     stickMapping.invertThrottle,
+    false,
   );
   const look = shapeStick(
     axis(snapshot.axes, stickMapping.lookXAxis),
     axis(snapshot.axes, stickMapping.lookYAxis),
-    deadZone,
+    lookDeadZone,
     stickMapping.invertLookX,
     stickMapping.invertLookY,
+    true,
   );
 
   return {
@@ -83,6 +94,7 @@ export function readGamepadSnapshot(snapshot: GamepadSnapshot, deadZone: number,
     ability,
     snap,
     shoot,
+    menu,
     pressedButtons: snapshot.buttons
       .map((button, index) => ({ index, value: button.value, pressed: button.pressed }))
       .filter((button) => button.pressed || button.value > 0.15)
@@ -98,7 +110,9 @@ function axis(axes: readonly number[], index: number): number {
 
 /**
  * Reads one stick as a single direction.
- * The dead zone is circular, so a diagonal push is not thrown away one axis at a time.
+ * Movement uses a circular zone, so a real diagonal push is kept.
+ * Look also drops each axis inside the zone first. A resting stick often sits a little
+ * off center on both axes, and that diagonal used to sneak past the circle and turn the camera.
  */
 function shapeStick(
   x: number,
@@ -106,10 +120,15 @@ function shapeStick(
   deadZone: number,
   invertX: boolean,
   invertY: boolean,
+  gateEachAxis: boolean,
 ): { x: number; y: number } {
   const zone = Math.min(0.95, Math.max(0, Number.isFinite(deadZone) ? deadZone : 0));
-  const rawX = Math.min(1, Math.max(-1, Number.isFinite(x) ? x : 0));
-  const rawY = Math.min(1, Math.max(-1, Number.isFinite(y) ? y : 0));
+  let rawX = Math.min(1, Math.max(-1, Number.isFinite(x) ? x : 0));
+  let rawY = Math.min(1, Math.max(-1, Number.isFinite(y) ? y : 0));
+  if (gateEachAxis) {
+    if (Math.abs(rawX) <= zone) rawX = 0;
+    if (Math.abs(rawY) <= zone) rawY = 0;
+  }
   const magnitude = Math.hypot(rawX, rawY);
   if (magnitude === 0 || magnitude <= zone) {
     return { x: 0, y: 0 };

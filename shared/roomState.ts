@@ -85,7 +85,7 @@ export function slotPose(slot: number): { x: number; z: number; heading: number 
   if (!Number.isInteger(slot) || slot < 0 || slot >= maxPlayers) {
     throw new Error(`Slot ${slot} is outside the starting grid.`);
   }
-  const edge = 8.4;
+  const edge = course.halfWidth - 4;
   const x = -edge + (slot * (edge * 2)) / (maxPlayers - 1);
   return { x, z: course.nest.z, heading: 0 };
 }

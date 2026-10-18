@@ -5,6 +5,15 @@ const canvas = document.querySelector<HTMLCanvasElement>("#renderCanvas");
 const hud = document.querySelector<HTMLElement>("#hud");
 const hudToggle = document.querySelector<HTMLButtonElement>("#hudToggle");
 const startScreen = document.querySelector<HTMLElement>("#startScreen");
+const homeStep = document.querySelector<HTMLElement>("#homeStep");
+const modeStep = document.querySelector<HTMLElement>("#modeStep");
+const setupStep = document.querySelector<HTMLElement>("#setupStep");
+const joinSetup = document.querySelector<HTMLElement>("#joinSetup");
+const playButton = document.querySelector<HTMLButtonElement>("#playButton");
+const chooseLocalButton = document.querySelector<HTMLButtonElement>("#chooseLocal");
+const chooseOnlineButton = document.querySelector<HTMLButtonElement>("#chooseOnline");
+const backToHomeButton = document.querySelector<HTMLButtonElement>("#backToHome");
+const backToModeButton = document.querySelector<HTMLButtonElement>("#backToMode");
 const startButton = document.querySelector<HTMLButtonElement>("#startRace");
 const countdown = document.querySelector<HTMLElement>("#countdown");
 const raceTimer = document.querySelector<HTMLElement>("#raceTimer");
@@ -30,6 +39,9 @@ const lobbySummary = document.querySelector<HTMLElement>("#lobbySummary");
 const readyToggle = document.querySelector<HTMLButtonElement>("#readyToggle");
 const startOnlineButton = document.querySelector<HTMLButtonElement>("#startOnline");
 const leaveRoomButton = document.querySelector<HTMLButtonElement>("#leaveRoom");
+const settingsButton = document.querySelector<HTMLButtonElement>("#settingsButton");
+const settingsMenu = document.querySelector<HTMLElement>("#settingsMenu");
+const closeSettingsButton = document.querySelector<HTMLButtonElement>("#closeSettings");
 const inputDevices = document.querySelector<HTMLFieldSetElement>("#inputChoice");
 
 const byId = (id: string) => document.querySelector<HTMLElement>(`#${id}`);
@@ -52,6 +64,15 @@ const ui: GameUi | null =
   hud &&
   hudToggle &&
   startScreen &&
+  homeStep &&
+  modeStep &&
+  setupStep &&
+  joinSetup &&
+  playButton &&
+  chooseLocalButton &&
+  chooseOnlineButton &&
+  backToHomeButton &&
+  backToModeButton &&
   startButton &&
   countdown &&
   raceTimer &&
@@ -77,6 +98,9 @@ const ui: GameUi | null =
   readyToggle &&
   startOnlineButton &&
   leaveRoomButton &&
+  settingsButton &&
+  settingsMenu &&
+  closeSettingsButton &&
   inputDevices &&
   healthHud &&
   netStatus &&
@@ -94,6 +118,15 @@ const ui: GameUi | null =
         hud,
         hudToggle,
         startScreen,
+        homeStep,
+        modeStep,
+        setupStep,
+        joinSetup,
+        playButton,
+        chooseLocalButton,
+        chooseOnlineButton,
+        backToHomeButton,
+        backToModeButton,
         startButton,
         countdown,
         raceTimer,
@@ -119,6 +152,9 @@ const ui: GameUi | null =
         readyToggle,
         startOnlineButton,
         leaveRoomButton,
+        settingsButton,
+        settingsMenu,
+        closeSettingsButton,
         inputDevices,
         healthHud,
         netStatus,
@@ -142,16 +178,16 @@ if (!canvas || !ui) {
 
 try {
   const params = new URLSearchParams(window.location.search);
-  const beachPreview = params.get("beachPreview") === "1";
+  const beachPreview = params.get("beachPreview") !== "0";
   const turtleModel = params.get("turtle") === "tmnt" ? "tmnt" : "ocean";
-  const credit = document.querySelector<HTMLElement>("#oceanTurtleCredit");
-  if (credit) credit.hidden = turtleModel === "tmnt";
   const previewLink = document.querySelector<HTMLAnchorElement>("#beachPreviewLink");
-  if (beachPreview && previewLink) {
-    previewLink.textContent = "Beach study · Back to course";
-    previewLink.href = turtleModel === "tmnt" ? "?turtle=tmnt" : "?";
-  } else if (previewLink && turtleModel === "tmnt") {
-    previewLink.href = "?beachPreview=1&turtle=tmnt";
+  if (previewLink) {
+    if (beachPreview) {
+      previewLink.hidden = true;
+    } else {
+      previewLink.textContent = "Good graphics";
+      previewLink.href = turtleModel === "tmnt" ? "?turtle=tmnt" : "?";
+    }
   }
   const game = startGame(canvas, ui, beachPreview, turtleModel);
 
@@ -162,6 +198,7 @@ try {
   }
 } catch (error) {
   const message = error instanceof Error ? error.message : "Unknown error";
+  ui.hud.hidden = false;
   ui.hud.textContent = `Could not start the 3D scene. ${message}`;
   console.error(error);
 }

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { selectActiveGamepad } from "./pollGamepads";
 import { readGamepadSnapshot } from "./readGamepad";
 import type { ButtonSnapshot, GamepadSnapshot } from "./types";
 
@@ -110,5 +111,35 @@ describe("readGamepadSnapshot", () => {
     const reading = readGamepadSnapshot(snapshot({ axes: [0.12, -0.1, 0, 0] }), 0.18);
     expect(reading.steer).toBe(0);
     expect(reading.throttle).toBe(0);
+  });
+
+  it("does not look when a resting right stick sits a little off center on both axes", () => {
+    const reading = readGamepadSnapshot(snapshot({ axes: [0, 0, 0.16, -0.14] }), 0.18, 1, 0.28);
+    expect(reading.lookX).toBe(0);
+    expect(reading.lookY).toBe(0);
+    expect(reading.steer).toBe(0);
+    expect(reading.throttle).toBe(0);
+  });
+
+  it("still looks when the right stick is actually pushed", () => {
+    const reading = readGamepadSnapshot(snapshot({ axes: [0, 0, 0.16, -1] }), 0.18, 1, 0.28);
+    expect(reading.lookX).toBe(0);
+    expect(reading.lookY).toBe(1);
+  });
+
+  it("reads the Menu button only on a standard pad", () => {
+    const xbox = readGamepadSnapshot(snapshot({ buttons: buttons([9]) }), 0.18);
+    const unknown = readGamepadSnapshot(snapshot({ mapping: "", buttons: buttons([9]) }), 0.18);
+    expect(xbox.menu).toBe(true);
+    expect(unknown.menu).toBe(false);
+  });
+});
+
+describe("selectActiveGamepad", () => {
+  it("prefers a standard pad over an earlier device that could drift", () => {
+    const noisy = snapshot({ id: "Virtual", index: 0, mapping: "", axes: [0.4, -0.4, 0.3, 0.2] });
+    const xbox = snapshot({ id: "Xbox", index: 1, mapping: "standard", axes: [0, 0, 0, 0] });
+    expect(selectActiveGamepad([noisy, xbox])?.id).toBe("Xbox");
+    expect(selectActiveGamepad([noisy])?.id).toBe("Virtual");
   });
 });

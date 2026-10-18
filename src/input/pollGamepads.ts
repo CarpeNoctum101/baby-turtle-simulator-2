@@ -1,8 +1,16 @@
 import { emptyGamepadReading, readGamepadSnapshot, type GamepadReading } from "./readGamepad";
 import type { GamepadSnapshot } from "./types";
 
+/**
+ * Prefers a pad that publishes the standard layout.
+ * A leftover or virtual device in the first slot can report a restless stick and turn the camera.
+ */
+export function selectActiveGamepad(connected: readonly GamepadSnapshot[]): GamepadSnapshot | undefined {
+  return connected.find((pad) => pad.mapping === "standard") ?? connected[0];
+}
+
 /** Reads connected controllers from the browser. Call this once per frame. */
-export function pollGamepads(deadZone: number): GamepadReading {
+export function pollGamepads(deadZone: number, lookDeadZone = deadZone): GamepadReading {
   const gamepads = navigator.getGamepads?.() ?? [];
   const connected: GamepadSnapshot[] = [];
 
@@ -22,10 +30,10 @@ export function pollGamepads(deadZone: number): GamepadReading {
     });
   }
 
-  const active = connected[0];
+  const active = selectActiveGamepad(connected);
   if (!active) {
     return emptyGamepadReading;
   }
 
-  return readGamepadSnapshot(active, deadZone, connected.length);
+  return readGamepadSnapshot(active, deadZone, connected.length, lookDeadZone);
 }

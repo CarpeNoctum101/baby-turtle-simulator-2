@@ -21,10 +21,13 @@ export function stepLook(
   dt: number,
 ): LookOffsets {
   const safeDt = Math.min(Math.max(dt, 0), 0.05);
+  // Values this small are leftover bias after the dead zone, not a deliberate look.
+  const yawStick = Math.abs(stick.x) < 0.04 ? 0 : stick.x;
+  const pitchStick = Math.abs(stick.y) < 0.04 ? 0 : stick.y;
   return {
-    yaw: look.yaw + mouse.yawDelta + stick.x * controlSettings.stickLookYawRate * safeDt,
+    yaw: look.yaw + mouse.yawDelta + yawStick * controlSettings.stickLookYawRate * safeDt,
     pitch: clamp(
-      look.pitch + mouse.pitchDelta + stick.y * controlSettings.stickLookPitchRate * safeDt,
+      look.pitch + mouse.pitchDelta + pitchStick * controlSettings.stickLookPitchRate * safeDt,
       -controlSettings.lookPitchLimit,
       controlSettings.lookPitchLimit,
     ),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { playerStart } from "./course";
+import { course, playerStart } from "./course";
 import { tideOrbSpots } from "../abilities/pickups";
 import { obstacleBodyRadius, obstacleLayout, overlapsObstacle, pushOutOfObstacles } from "./obstacles";
 
@@ -29,9 +29,10 @@ describe("course obstacles", () => {
     for (const orb of tideOrbSpots) {
       expect(overlapsObstacle(orb.x, orb.z, 0.6)).toBe(false);
     }
-    for (let z = -24; z <= 52; z += 1) {
+    const limit = course.halfWidth - 1;
+    for (let z = course.nest.z; z <= course.water.maxZ; z += 1) {
       let open = false;
-      for (let x = -10; x <= 10; x += 0.5) {
+      for (let x = -limit; x <= limit; x += 0.5) {
         if (!overlapsObstacle(x, z, obstacleBodyRadius)) {
           open = true;
           break;
@@ -39,5 +40,14 @@ describe("course obstacles", () => {
       }
       expect(open).toBe(true);
     }
+  });
+
+  it("spreads solid obstacles from behind the nest through the water", () => {
+    const zs = obstacleLayout.map((obstacle) => obstacle.z);
+    expect(Math.min(...zs)).toBeLessThan(course.nest.z);
+    expect(Math.max(...zs)).toBeGreaterThan(course.wet.maxZ);
+    expect(obstacleLayout.some((obstacle) => obstacle.x < -course.halfWidth * 0.5)).toBe(true);
+    expect(obstacleLayout.some((obstacle) => obstacle.x > course.halfWidth * 0.5)).toBe(true);
+    expect(obstacleLayout.length).toBeGreaterThanOrEqual(12);
   });
 });

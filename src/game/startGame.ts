@@ -11,7 +11,7 @@ import { spinRules } from "../abilities/specials";
 import { createAbilityWorld, stepAbilityWorld, type AbilityCue, type AbilityWorld } from "../abilities/stepAbilityWorld";
 import type { WorldView } from "../../shared/beachHazards";
 import { createAbilityCues } from "../audio/abilityCues";
-import { aimThroughCrosshair, createFollowCamera, resetFollowCamera, updateFollowCamera } from "../camera/createThirdPersonCamera";
+import { aimThroughCrosshair, createFollowCamera, frameTitleShot, resetFollowCamera, updateFollowCamera } from "../camera/createThirdPersonCamera";
 import { abilityIcon } from "../hud/abilityIcon";
 import { formatAbilityHud, formatAbilityLine, formatPlace } from "../hud/formatAbilityHud";
 import { formatHealth, formatSpecial } from "../hud/formatHealthHud";
@@ -45,7 +45,6 @@ import {
 } from "../net/onlineClient";
 import { createRemoteTurtles } from "../net/remoteTurtles";
 import { canDrive, countdownLabel, createRaceState, formatRaceTime, startCountdown, stepRace, type RaceState } from "../race/raceState";
-import { createRivalMotion, raceStanding, stepRival } from "../race/stepRival";
 import { createBeachScene } from "../scene/createBeachScene";
 import { createSpaceEnding } from "../scene/ending/createSpaceEnding";
 import { stepTurtleAnimation, type TurtleAnimation } from "../turtle/animateTurtle";
@@ -55,10 +54,22 @@ import { createSculptedTurtle } from "../turtle/createSculptedTurtle";
 import { defaultTurtleType, scaleCrawl, turtleTypeList, turtleTypes, type TurtleTypeId } from "../turtle/turtleTypes";
 import { createEndingState, sampleEnding, stepEnding, type EndingPhase, type EndingState } from "./endingState";
 
+/** Local races have one turtle. This pose stays off the beach so nothing can bump a hidden rival. */
+const absentRival: TurtleMotion = { x: 500, z: 500, heading: 0, speed: 0, steer: 0 };
+
 export interface GameUi {
   hud: HTMLElement;
   hudToggle: HTMLButtonElement;
   startScreen: HTMLElement;
+  homeStep: HTMLElement;
+  modeStep: HTMLElement;
+  setupStep: HTMLElement;
+  joinSetup: HTMLElement;
+  playButton: HTMLButtonElement;
+  chooseLocalButton: HTMLButtonElement;
+  chooseOnlineButton: HTMLButtonElement;
+  backToHomeButton: HTMLButtonElement;
+  backToModeButton: HTMLButtonElement;
   startButton: HTMLButtonElement;
   countdown: HTMLElement;
   raceTimer: HTMLElement;
@@ -84,6 +95,9 @@ export interface GameUi {
   readyToggle: HTMLButtonElement;
   startOnlineButton: HTMLButtonElement;
   leaveRoomButton: HTMLButtonElement;
+  settingsButton: HTMLButtonElement;
+  settingsMenu: HTMLElement;
+  closeSettingsButton: HTMLButtonElement;
   inputDevices: HTMLFieldSetElement;
   healthHud: HTMLElement;
   netStatus: HTMLElement;
@@ -120,6 +134,8 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
   const scene = createBeachScene(engine, beachPreview);
   const turtle = turtleModel === "tmnt" ? createSculptedTurtle(scene) : createOceanTurtle(scene);
   const rivalTurtle = turtleModel === "tmnt" ? createSculptedTurtle(scene, { id: "rival", redMask: true }) : createOceanTurtle(scene, { id: "rival" });
+  // Local races are just the player. The rival mesh stays in the scene for ability code, but it is never shown.
+  rivalTurtle.root.setEnabled(false);
   const camera = createFollowCamera(scene);
   // Keep camera-relative forward aimed at the finish in both course views.
   const initialLook: LookOffsets = { yaw: 0, pitch: beachPreview ? 0.22 : 0 };
@@ -135,7 +151,7 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
   const inactiveEffects = createEffects();
 
   let motion = createTurtleMotion();
-  let rival = createRivalMotion(motion);
+  let rival = absentRival;
   let look: LookOffsets = { ...initialLook };
   let race = createRaceState();
   let ending: EndingState | null = null;
@@ -147,6 +163,7 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
   let abilityWasDown = false;
   let specialWasDown = false;
   let shootWasDown = false;
+  let menuWasDown = false;
   let controlsLocked = false;
   let spinAngle = 0;
   let hurtFlash = 0;
@@ -155,7 +172,10 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
   let clock = 0;
   const animation: TurtleAnimation = { phase: 0 };
   const rivalAnimation: TurtleAnimation = { phase: 0 };
-  let hudVisible = !beachPreview;
+  let hudVisible = false;
+  let settingsOpen = false;
+  let menuStep: "home" | "mode" | "setup" = "home";
+  let playPath: "local" | "online" = "local";
   const heldEdges = new Set<string>();
   let online = false;
   let sharedBeach: WorldView | null = null;
@@ -223,18 +243,43 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     spaceEnding.reset();
     ending = null;
     motion = createTurtleMotion();
-    rival = createRivalMotion(motion);
+    rival = absentRival;
     look = { ...initialLook };
     resetFollowCamera(camera);
     race = startCountdown(race);
     resetCombat();
     animation.phase = 0;
     rivalAnimation.phase = 0;
-    setHudVisible(!beachPreview);
     mouse.consume();
     placeTurtle(turtle, motion);
     placeTurtle(rivalTurtle, rival);
     canvas.focus();
+  };
+  const showMenu = (step: "home" | "mode" | "setup") => {
+    menuStep = step;
+    ui.startScreen.dataset.step = step;
+    ui.homeStep.hidden = step !== "home";
+    ui.modeStep.hidden = step !== "mode";
+    ui.setupStep.hidden = step !== "setup";
+    ui.startButton.hidden = playPath !== "local";
+    ui.joinSetup.hidden = playPath !== "online";
+  };
+  const returnToMenu = () => {
+    spaceEnding.reset();
+    ending = null;
+    motion = createTurtleMotion();
+    rival = absentRival;
+    look = { ...initialLook };
+    resetFollowCamera(camera);
+    race = createRaceState();
+    resetCombat();
+    animation.phase = 0;
+    rivalAnimation.phase = 0;
+    mouse.consume();
+    placeTurtle(turtle, motion);
+    placeTurtle(rivalTurtle, rival);
+    canvas.focus();
+    showMenu("home");
   };
   const beginFromMenu = () => {
     cues.unlock();
@@ -320,6 +365,13 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     } else {
       ui.lobbySummary.textContent = `Room ${roomCode}. ${connected.length} connected. ${names.join(", ")}. Ready up, then the host starts the countdown.`;
     }
+    if (roomCode) ui.roomCodeInput.value = roomCode;
+    if (onlinePhase === "lobby" && roomCode) {
+      const readyCount = connected.filter((player) => player.ready).length;
+      ui.onlineStatus.textContent = connected.length <= 1
+        ? `Room ${roomCode}. Share the code, then ready up.`
+        : `Room ${roomCode}. ${readyCount} of ${connected.length} ready.`;
+    }
     ui.readyToggle.hidden = onlinePhase !== "lobby";
     ui.readyToggle.textContent = me?.ready ? "Not ready" : "Ready";
     ui.startOnlineButton.hidden = onlinePhase !== "lobby" || onlineHostId !== selfId;
@@ -403,14 +455,13 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
       }
     }
     remotes.clear();
-    rivalTurtle.root.setEnabled(true);
     if (forget) {
       clearTicket();
     }
     spaceEnding.reset();
     ending = null;
     motion = createTurtleMotion();
-    rival = createRivalMotion(motion);
+    rival = absentRival;
     race = createRaceState();
     resetCombat();
     placeTurtle(turtle, motion);
@@ -418,6 +469,7 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     ui.onlineStatus.textContent = status;
     ui.lobbyBar.hidden = true;
     ui.startScreen.hidden = false;
+    showMenu("home");
     ui.rematchButton.disabled = false;
     ui.resultsTitle.textContent = "You reached the sea";
     ui.resultsTable.hidden = true;
@@ -657,13 +709,31 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     });
   };
 
+  const setSettingsOpen = (open: boolean) => {
+    settingsOpen = open;
+    ui.settingsMenu.hidden = !open;
+    ui.settingsButton.setAttribute("aria-expanded", String(open));
+  };
+  const onSettingsButton = () => setSettingsOpen(!settingsOpen);
+  const onCloseSettings = () => setSettingsOpen(false);
+  const onSettingsBackdrop = (event: MouseEvent) => {
+    if (event.target === ui.settingsMenu) setSettingsOpen(false);
+  };
   const onLeaveRoom = () => {
-    stopOnline("", true);
+    setSettingsOpen(false);
+    if (online) {
+      stopOnline("", true);
+      return;
+    }
+    returnToMenu();
   };
 
   ui.createRoomButton.addEventListener("click", onCreateRoom);
   ui.joinRoomButton.addEventListener("click", onJoinRoom);
   ui.leaveRoomButton.addEventListener("click", onLeaveRoom);
+  ui.settingsButton.addEventListener("click", onSettingsButton);
+  ui.closeSettingsButton.addEventListener("click", onCloseSettings);
+  ui.settingsMenu.addEventListener("click", onSettingsBackdrop);
   const onReady = () => {
     const me = onlinePlayers.find((player) => player.id === selfId);
     session?.sendReady(!me?.ready);
@@ -675,16 +745,36 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
   ui.startOnlineButton.addEventListener("click", onStartOnline);
 
   const presetRoom = new URLSearchParams(window.location.search).get("room");
+  const savedTicket = loadTicket();
   if (presetRoom) {
     ui.roomCodeInput.value = presetRoom;
-  } else {
-    const saved = loadTicket();
-    if (saved) {
-      ui.playerName.value = saved.name;
-      ui.roomCodeInput.value = saved.roomCode;
-      attachOnline(saved);
-    }
+  } else if (savedTicket) {
+    ui.playerName.value = savedTicket.name;
+    ui.roomCodeInput.value = savedTicket.roomCode;
   }
+  const onPlay = () => showMenu("mode");
+  const onChooseLocal = () => {
+    playPath = "local";
+    showMenu("setup");
+  };
+  const onChooseOnline = () => {
+    playPath = "online";
+    showMenu("setup");
+  };
+  const onBackHome = () => showMenu("home");
+  const onBackMode = () => {
+    if (online) {
+      stopOnline("", true);
+    }
+    playPath = "local";
+    showMenu("mode");
+  };
+  ui.playButton.addEventListener("click", onPlay);
+  ui.chooseLocalButton.addEventListener("click", onChooseLocal);
+  ui.chooseOnlineButton.addEventListener("click", onChooseOnline);
+  ui.backToHomeButton.addEventListener("click", onBackHome);
+  ui.backToModeButton.addEventListener("click", onBackMode);
+  showMenu("home");
 
   const setHudVisible = (visible: boolean) => {
     hudVisible = visible;
@@ -810,17 +900,22 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     if (keyboard.keys.size > 0) {
       cues.unlock();
     }
-    if (pressedOnce("BracketLeft")) {
+    const typing = document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement;
+    if (!typing && pressedOnce("BracketLeft")) {
       setStickDeadZone(controlSettings.stickDeadZone - 0.01);
     }
-    if (pressedOnce("BracketRight")) {
+    if (!typing && pressedOnce("BracketRight")) {
       setStickDeadZone(controlSettings.stickDeadZone + 0.01);
     }
-    if (pressedOnce("KeyH")) {
+    if (!typing && pressedOnce("KeyH")) {
       setHudVisible(!hudVisible);
     }
-    if (pressedOnce("Enter") && !online && (!ending || sampleEnding(ending).phase === "space")) {
-      beginFromMenu();
+    if (!typing && pressedOnce("Escape")) {
+      setSettingsOpen(!settingsOpen);
+    }
+    if (!typing && pressedOnce("Enter") && !settingsOpen && !online && (!ending || sampleEnding(ending).phase === "space")) {
+      if (menuStep === "home") showMenu("mode");
+      else if (menuStep === "setup" && playPath === "local") beginFromMenu();
     }
     const restartPressed = pressedOnce("KeyR");
     if (restartPressed && online && onlinePhase === "lobby") {
@@ -831,8 +926,14 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
       restartRace();
     }
 
-    const gamepad = pollGamepads(controlSettings.stickDeadZone);
+    const lookZone = Math.max(controlSettings.stickDeadZone, controlSettings.lookDeadZoneFloor);
+    const gamepad = pollGamepads(controlSettings.stickDeadZone, lookZone);
     const limited = limitInput(inputChoice, readKeyboard(keyboard.keys), gamepad);
+    const menuDown = limited.gamepad.menu;
+    if (menuDown && !menuWasDown) {
+      setSettingsOpen(!settingsOpen);
+    }
+    menuWasDown = menuDown;
     const movement = combineMovement(limited.keyboard, limited.gamepad);
     const canOnlineDrive = onlinePhase === "lobby" || onlinePhase === "countdown" || (onlinePhase === "racing" && selfPlace === 0);
     const localDrive = canDrive(race.phase) && !controlsLocked;
@@ -850,6 +951,8 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     shootWasDown = shootDown;
     if (ending) {
       ending = stepEnding(ending, dt);
+      mouse.consume();
+    } else if (menuStep === "home") {
       mouse.consume();
     } else {
       const pointer = mouse.consume();
@@ -928,10 +1031,6 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
         x: clampToBeach(motion.x + shift.x),
         z: clampToCourse(motion.z + shift.z),
       };
-      if (race.phase === "racing") {
-        rival = stepRival(rival, motion, dt, scaleCrawl(speedModifiers(world.rivalEffects),
-          exhaustionScale(world.rivalHealth) * netSpeedScale(world.nets, "rival")));
-      }
     } else if (online && canOnlineDrive && !ending && playerLift <= 0) {
       const playerPace = turtleType.speedScale * exhaustionScale(world.playerHealth) * netSpeedScale(world.nets, "player");
       motion = stepTurtle(motion, drive, dt, planFromYaw(look.yaw), scaleCrawl(speedModifiers(world.loadout.effects), playerPace));
@@ -944,10 +1043,6 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     if (!ending && playerLift <= 0) {
       const pushed = pushOutOfObstacles(motion.x, motion.z);
       motion = { ...motion, x: clampToBeach(pushed.x), z: clampToCourse(pushed.z) };
-    }
-    if (!ending) {
-      const pushed = pushOutOfObstacles(rival.x, rival.z);
-      rival = { ...rival, x: clampToBeach(pushed.x), z: clampToCourse(pushed.z) };
     }
     if (online && !ending) {
       const serverNow = Date.now() + clockOffset;
@@ -1015,7 +1110,8 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
       spaceEnding.update(endingFrame, dt);
     } else {
       placeTurtle(turtle, motion, playerLift);
-      updateFollowCamera(camera, look, motion.x, motion.z, playerLift);
+      if (menuStep === "home") frameTitleShot(camera, motion.x, motion.z);
+      else updateFollowCamera(camera, look, motion.x, motion.z, playerLift);
     }
     placeTurtle(rivalTurtle, rival);
     if (online) {
@@ -1082,7 +1178,7 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
       ? selfPlace > 0
         ? { place: selfPlace, field: Math.max(1, onlinePlayers.length) }
         : liveStanding(onlinePlayers, selfId, motion.z)
-      : raceStanding(motion.z, rival.z);
+      : { place: 1, field: 1 };
     const abilityView = formatAbilityHud({
       held: world.loadout.held,
       spare: online ? null : world.loadout.spare,
@@ -1090,7 +1186,14 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     });
     syncAbilityHud(ui, abilityView);
     syncHealthHud(ui, world, turtleType, hurtFlash > 0, online);
-    syncRaceUi(ui, race, hudVisible, standing, endingFrame?.phase ?? null, online);
+    if (endingFrame && endingFrame.phase !== "space" && settingsOpen) {
+      setSettingsOpen(false);
+    }
+    if (online && onlinePhase === "lobby" && menuStep !== "setup") {
+      playPath = "online";
+      showMenu("setup");
+    }
+    syncRaceUi(ui, race, hudVisible, standing, endingFrame?.phase ?? null, online, online ? onlinePhase : null, menuStep);
     const bubbleArmed = world.loadout.effects.bubbleGunRemaining > 0 && world.loadout.effects.bubbleShotsLeft > 0;
     const aiming = endingFrame === null && bubbleArmed && (online ? onlinePhase === "racing" : race.phase === "racing");
     ui.crosshair.hidden = !aiming;
@@ -1137,11 +1240,19 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
       window.removeEventListener("resize", onResize);
       ui.hudToggle.removeEventListener("click", onToggleHud);
       for (const cleanup of pickerCleanups) cleanup();
+      ui.playButton.removeEventListener("click", onPlay);
+      ui.chooseLocalButton.removeEventListener("click", onChooseLocal);
+      ui.chooseOnlineButton.removeEventListener("click", onChooseOnline);
+      ui.backToHomeButton.removeEventListener("click", onBackHome);
+      ui.backToModeButton.removeEventListener("click", onBackMode);
       ui.startButton.removeEventListener("click", beginFromMenu);
       ui.rematchButton.removeEventListener("click", onRematch);
       ui.createRoomButton.removeEventListener("click", onCreateRoom);
       ui.joinRoomButton.removeEventListener("click", onJoinRoom);
       ui.leaveRoomButton.removeEventListener("click", onLeaveRoom);
+      ui.settingsButton.removeEventListener("click", onSettingsButton);
+      ui.closeSettingsButton.removeEventListener("click", onCloseSettings);
+      ui.settingsMenu.removeEventListener("click", onSettingsBackdrop);
       ui.readyToggle.removeEventListener("click", onReady);
       ui.startOnlineButton.removeEventListener("click", onStartOnline);
       ui.inputDevices.removeEventListener("change", onInputChoice);
@@ -1206,15 +1317,21 @@ function syncRaceUi(
   standing: { place: number; field: number },
   endingPhase: EndingPhase | null,
   onlineMode: boolean,
+  onlinePhase: RoomPhase | null,
+  menuStep: "home" | "mode" | "setup",
 ): void {
   const cinematic = endingPhase !== null && endingPhase !== "space";
-  const menuOpen = !onlineMode && (race.phase === "ready" || (race.phase === "finished" && !cinematic));
+  const atFrontDoor = (!onlineMode && race.phase === "ready") || (onlineMode && onlinePhase === "lobby");
+  const menuOpen = atFrontDoor || (!onlineMode && race.phase === "finished" && !cinematic);
   ui.hud.hidden = menuOpen || cinematic || !hudVisible;
   ui.hudToggle.hidden = menuOpen || cinematic;
   ui.abilityHud.hidden = menuOpen || cinematic || (onlineMode && race.phase !== "racing");
   ui.healthHud.hidden = menuOpen || cinematic;
-  ui.startScreen.hidden = onlineMode || race.phase !== "ready";
-  ui.lobbyBar.hidden = !onlineMode;
+  ui.settingsButton.hidden = cinematic || (atFrontDoor && menuStep === "home");
+  ui.leaveRoomButton.hidden = !onlineMode && (race.phase === "ready" || menuStep !== "setup");
+  ui.readyToggle.disabled = !onlineMode;
+  ui.startScreen.hidden = !atFrontDoor;
+  ui.lobbyBar.hidden = !onlineMode || onlinePhase === "lobby";
   ui.results.hidden = race.phase !== "finished" || cinematic;
   const label = countdownLabel(race);
   ui.countdown.hidden = label === null;
@@ -1323,11 +1440,11 @@ function syncHealthHud(
   ui.healthHud.dataset.tone = player.tone;
   ui.healthHud.dataset.hurt = String(hurt);
   const rival = formatHealth(world.rivalHealth, "Rival");
-  ui.rivalHealthLabel.hidden = onlineMode;
+  ui.rivalHealthLabel.hidden = true;
   ui.rivalHealthLabel.textContent = rival.label;
   ui.rivalHealthFill.style.width = `${rival.fraction * 100}%`;
   if (ui.rivalHealthFill.parentElement) {
-    ui.rivalHealthFill.parentElement.hidden = onlineMode;
+    ui.rivalHealthFill.parentElement.hidden = true;
   }
 
   ui.abilitySpare.hidden = onlineMode || type.itemSlots < 2;

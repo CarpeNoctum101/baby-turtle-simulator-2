@@ -37,4 +37,17 @@ describe("stepLook", () => {
     expect(still.yaw).toBe(0);
     expect(looked.yaw).toBeLessThan(-0.05);
   });
+
+  it("does not accumulate camera drift from a tiny leftover stick value", () => {
+    let look = { yaw: 0, pitch: 0 };
+    const still = { yawDelta: 0, pitchDelta: 0 };
+    for (let step = 0; step < 300; step += 1) {
+      look = stepLook(look, still, { x: 0.02, y: -0.03 }, 1 / 60);
+    }
+    expect(look.yaw).toBe(0);
+    expect(look.pitch).toBe(0);
+
+    const nudged = stepLook({ yaw: 0, pitch: 0 }, still, { x: 0.2, y: 0 }, 0.05);
+    expect(nudged.yaw).toBeGreaterThan(0.01);
+  });
 });

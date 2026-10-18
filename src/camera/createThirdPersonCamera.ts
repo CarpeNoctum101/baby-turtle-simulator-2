@@ -27,6 +27,7 @@ export function createFollowCamera(scene: Scene): FollowCameraRig {
   const camera = new ArcRotateCamera("thirdPerson", restAlpha, restBeta, 6.5, target, scene);
   camera.inputs.clear();
   camera.inertia = 0;
+  camera.panningInertia = 0;
   camera.panningSensibility = 0;
   camera.lowerRadiusLimit = 3.5;
   camera.upperRadiusLimit = 14;
@@ -65,10 +66,31 @@ export function resetFollowCamera(rig: FollowCameraRig): void {
   rig.camera.inertialPanningY = 0;
 }
 
+/**
+ * Title-screen framing. Wider than the race camera, and aimed past the shell
+ * so the turtle sits in the open sand instead of under the Play button.
+ * The race zoom on the rig is left alone.
+ */
+export function frameTitleShot(rig: FollowCameraRig, x: number, z: number): void {
+  rig.target.set(x, eyeHeight + 0.7, z + 1.1);
+  rig.camera.inertia = 0;
+  rig.camera.panningInertia = 0;
+  rig.camera.alpha = restAlpha;
+  rig.camera.beta = 1.16;
+  rig.camera.radius = 10.5;
+  rig.camera.inertialAlphaOffset = 0;
+  rig.camera.inertialBetaOffset = 0;
+  rig.camera.inertialRadiusOffset = 0;
+  rig.camera.inertialPanningX = 0;
+  rig.camera.inertialPanningY = 0;
+}
+
 /** Puts the camera behind the look direction. The turtle's heading is not used. */
 export function updateFollowCamera(rig: FollowCameraRig, look: LookOffsets, x: number, z: number, lift = 0): void {
   // While a seagull carries the turtle the view rises with it, so the ride stays on screen.
   rig.target.set(x, eyeHeight + lift * 0.8, z);
+  rig.camera.inertia = 0;
+  rig.camera.panningInertia = 0;
   rig.camera.alpha = restAlpha + look.yaw;
   rig.camera.beta = clamp(restBeta + look.pitch, minBeta, maxBeta);
   rig.camera.radius = rig.radius;

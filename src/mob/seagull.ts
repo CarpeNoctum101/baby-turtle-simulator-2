@@ -107,12 +107,14 @@ export function createSeagull(id: string, home: Vec2, flier = false): Seagull {
   };
 }
 
-/** Where the game puts seagulls. Two walk in low; the two marked `flier` circle high and dive. */
+/**
+ * Where the game puts seagulls.
+ * Ground gulls are turned off for now. Only the fliers remain: they circle high and dive.
+ * The walking homes were gull-1 near the dry sand and gull-3 on the wet sand.
+ */
 export const seagullSpawns: readonly { id: string; home: Vec2; flier?: boolean }[] = [
-  { id: "gull-1", home: { x: -5, z: -8 } },
-  { id: "gull-2", home: { x: 2.5, z: 4 }, flier: true },
-  { id: "gull-3", home: { x: -4, z: 18 } },
-  { id: "gull-4", home: { x: 4, z: 30 }, flier: true },
+  { id: "gull-2", home: { x: 7, z: 2 }, flier: true },
+  { id: "gull-4", home: { x: -6, z: 32 }, flier: true },
 ];
 
 export function isRescuePhase(phase: SeagullPhase): boolean {

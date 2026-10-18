@@ -8,7 +8,9 @@ import { obstacleLayout } from "../movement/obstacles";
 
 /** Draws the nest, the three surface bands, and the finish gate. */
 export function createCourse(scene: Scene): void {
-  addStrip(scene, "surroundingSand", 70, 110, 8, new Color3(0.84, 0.72, 0.46), 0);
+  const courseSpan = course.finish.maxZ - course.dry.minZ;
+  const courseCenter = (course.finish.maxZ + course.dry.minZ) / 2;
+  addStrip(scene, "surroundingSand", course.halfWidth * 2 + 40, courseSpan + 28, courseCenter, new Color3(0.84, 0.72, 0.46), 0);
   addStrip(
     scene,
     "drySand",
@@ -115,8 +117,10 @@ function addStrip(
 }
 
 function addBerm(scene: Scene, x: number): void {
-  const berm = MeshBuilder.CreateBox(x > 0 ? "rightBerm" : "leftBerm", { width: 0.7, height: 0.28, depth: 86 }, scene);
-  berm.position.set(x, 0.14, 10);
+  const depth = course.finish.maxZ - course.dry.minZ;
+  const centerZ = (course.finish.maxZ + course.dry.minZ) / 2;
+  const berm = MeshBuilder.CreateBox(x > 0 ? "rightBerm" : "leftBerm", { width: 0.7, height: 0.28, depth }, scene);
+  berm.position.set(x, 0.14, centerZ);
   const material = new StandardMaterial(`${berm.name}Material`, scene);
   material.diffuseColor = new Color3(0.72, 0.58, 0.36);
   material.specularColor = new Color3(0.03, 0.03, 0.03);

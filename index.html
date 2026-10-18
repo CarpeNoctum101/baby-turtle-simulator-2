@@ -3,15 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Baby Turtle Simulator</title>
+    <title>Baby Turtle Simulator 2</title>
   </head>
   <body>
     <canvas id="renderCanvas" tabindex="0"></canvas>
     <div id="crosshair" hidden aria-hidden="true">
       <span></span><span></span><span></span><span></span>
     </div>
-    <button id="hudToggle" type="button" aria-controls="hud" aria-expanded="true">Hide readout</button>
-    <pre id="hud">Starting the beach scene…</pre>
+    <button id="hudToggle" type="button" aria-controls="hud" aria-expanded="false">Show readout</button>
+    <pre id="hud" hidden>Starting the beach scene…</pre>
     <p id="countdown" hidden>3</p>
     <p id="raceTimer" hidden>0:00.0</p>
     <p id="netStatus" role="status" hidden></p>
@@ -39,50 +39,79 @@
         </div>
       </div>
     </aside>
-    <section id="startScreen" class="overlay">
-      <div class="panel">
-        <h1>Baby Turtle Simulator</h1>
-        <p>Crawl from the nest, across the beach, and through the gate into the sea.</p>
-        <p>The left stick moves. Up follows the camera, and left or right move sideways. Only the right stick turns the camera, including up and down. Space or B brakes. Collect a spinning question-mark item box; X or the right trigger uses its ability. E or Y uses your turtle's own move: Snappy snaps, Leatherback body slams, Kempy spin dashes (Regular has none, but holds 2 power-ups).</p>
-        <p>Pick a turtle:</p>
+    <section id="startScreen" class="overlay front-door" data-step="home">
+      <div id="homeStep" class="home-card">
+        <h1>Baby Turtle Simulator 2</h1>
+        <button id="playButton" class="primary" type="button">Play</button>
+      </div>
+      <div id="modeStep" class="panel mode-card" hidden>
+        <p class="eyebrow">Baby Turtle Simulator 2</p>
+        <h2>How do you want to race?</h2>
+        <button id="chooseLocal" class="primary" type="button">Start a race</button>
+        <button id="chooseOnline" class="primary" type="button">Join a race</button>
+        <button id="backToHome" class="ghost" type="button">Back</button>
+      </div>
+      <div id="setupStep" class="panel setup-card" hidden>
+        <p class="section-label">Choose a turtle</p>
         <div class="typePicker" role="radiogroup" aria-label="Turtle type"></div>
-        <p>A second hatchling follows behind you. Sand Spray only catches a racer in the cloud behind your shell. The pale band at the shoreline is the wave zone.</p>
-        <p>Rocks and logs block the crawl, so steer around them. Bubble Shot comes from an item box. X or the right trigger arms it and fires the first shot toward the crosshair. The same button fires the other two shots before the timer ends. A hit traps another turtle or a seagull for a short time.</p>
-        <p>Watch for the seagull near the middle of the dry sand. It chases at a little under your speed, and a hit knocks you both back. If your health reaches zero it carries you back toward the nest.</p>
-        <p>People beside the track throw nets. Dodge the glowing landing circle: a net slows you and locks your abilities. Mash X or the right trigger to shorten that slow. Shell Guard or Kempy's spin can block a hit.</p>
-        <button id="startRace" type="button">Start race</button>
-        <p>Start race stays on this computer. An online room shares the countdown, item boxes, finish order, nets, seagulls and bubbles. A net or a seagull locks onto one turtle at a time. The server decides places.</p>
-        <p>On one computer, set one window to Keyboard only and the other to Controller only.</p>
-        <label class="field">Name <input id="playerName" maxlength="16" value="Hatchling" autocomplete="nickname" /></label>
-        <button id="createRoom" type="button">Create online room</button>
-        <label class="field">Room code <input id="roomCode" maxlength="4" autocapitalize="characters" autocomplete="off" spellcheck="false" /></label>
-        <button id="joinRoom" type="button">Join online room</button>
-        <p id="onlineStatus" role="status"></p>
-        <p class="credit" id="oceanTurtleCredit">Ocean Turtle by der_On · <a href="/credits/ocean-turtle.txt" target="_blank" rel="noopener">CC BY 3.0 · adapted</a></p>
-        <p class="credit">Seagull model by Bwinji Shamutete (Sketchfab), CC BY 4.0.</p>
+        <button id="startRace" class="primary" type="button">Start race</button>
+        <div id="joinSetup" hidden>
+          <p class="hint">Create a room or enter a code. Then ready up. The host starts the countdown.</p>
+          <label class="field">Name <input id="playerName" maxlength="16" value="Hatchling" autocomplete="nickname" /></label>
+          <div class="button-row">
+            <button id="createRoom" type="button">Create room</button>
+            <button id="joinRoom" type="button">Join room</button>
+          </div>
+          <label class="field">Room code <input id="roomCode" maxlength="4" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="ABCD" /></label>
+          <p id="onlineStatus" role="status"></p>
+          <button id="readyToggle" class="primary" type="button">Ready</button>
+          <button id="startOnline" class="primary" type="button" hidden>Start race</button>
+        </div>
+        <button id="backToMode" class="ghost" type="button">Back</button>
       </div>
     </section>
-    <section id="results" class="overlay" hidden>
+    <section id="results" class="overlay menu-overlay" hidden>
       <div class="panel">
         <h2 id="resultsTitle">You reached the sea</h2>
         <p id="resultsPlace">1st of 1</p>
         <p id="resultsTime">Time 0:00.0</p>
         <ol id="resultsTable" hidden></ol>
         <div class="typePicker" role="radiogroup" aria-label="Turtle type"></div>
-        <button id="rematch" type="button">Rematch</button>
+        <button id="rematch" class="primary" type="button">Rematch</button>
       </div>
     </section>
-    <fieldset id="inputChoice">
-      <legend>This window</legend>
-      <label><input type="radio" name="inputDevice" value="both" checked /> Keyboard and controller</label>
-      <label><input type="radio" name="inputDevice" value="keyboard" /> Keyboard only</label>
-      <label><input type="radio" name="inputDevice" value="gamepad" /> Controller only</label>
-    </fieldset>
+    <button id="settingsButton" type="button" aria-haspopup="dialog" aria-controls="settingsMenu" aria-expanded="false" aria-label="Settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"></circle>
+        <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 3v2.2M12 18.8V21M3 12h2.2M18.8 12H21M5.6 5.6l1.6 1.6M16.8 16.8l1.6 1.6M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6"></path>
+      </svg>
+    </button>
+    <section id="settingsMenu" class="overlay settings-overlay" hidden>
+      <div class="panel settings-card" role="dialog" aria-labelledby="settingsTitle">
+        <p class="eyebrow">Options</p>
+        <h2 id="settingsTitle">Settings</h2>
+        <fieldset id="inputChoice">
+          <legend>This window</legend>
+          <label><input type="radio" name="inputDevice" value="both" checked /> Keyboard and controller</label>
+          <label><input type="radio" name="inputDevice" value="keyboard" /> Keyboard only</label>
+          <label><input type="radio" name="inputDevice" value="gamepad" /> Controller only</label>
+        </fieldset>
+        <p class="section-label">How to play</p>
+        <ul class="tips">
+          <li><strong>Move</strong> Left stick or WASD follows the camera.</li>
+          <li><strong>Look</strong> Right stick, or hold the right mouse button.</li>
+          <li><strong>Brake</strong> Space or B. Items use X or the right trigger.</li>
+          <li><strong>Special</strong> E or Y. Snappy snaps, Leatherback slams, Kempy spins.</li>
+        </ul>
+        <p class="hint">The controller Menu button opens this panel. H shows the debug readout. If the camera creeps while the sticks are still, press ] to ignore more stick drift. [ lowers that.</p>
+        <div class="settings-actions">
+          <button id="leaveRoom" class="danger" type="button" hidden>Leave game</button>
+          <button id="closeSettings" class="ghost" type="button">Close</button>
+        </div>
+      </div>
+    </section>
     <aside id="lobbyBar" hidden>
       <p id="lobbySummary">Online room</p>
-      <button id="readyToggle" type="button">Ready</button>
-      <button id="startOnline" type="button" hidden>Start race</button>
-      <button id="leaveRoom" type="button">Leave room</button>
     </aside>
     <a id="beachPreviewLink" href="?beachPreview=1">Explore the beach preview ↗</a>
     <script type="module" src="/src/main.ts"></script>

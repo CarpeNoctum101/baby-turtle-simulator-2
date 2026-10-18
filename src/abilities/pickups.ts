@@ -4,11 +4,11 @@ import type { AbilityLoadout } from "./abilityState";
 
 /** Fixed spots along the beach. Each roll is random. Position does not change the odds yet. */
 export const tideOrbSpots = [
-  { id: "orb-nest-left", x: -5.5, z: -16 },
-  { id: "orb-dry-right", x: 5.2, z: -2 },
-  { id: "orb-wet-left", x: -4.6, z: 18 },
-  { id: "orb-shore-right", x: 4.8, z: 28 },
-  { id: "orb-water", x: -3.5, z: 38 },
+  { id: "orb-nest-left", x: -8, z: -14 },
+  { id: "orb-dry-right", x: 9, z: 4 },
+  { id: "orb-wet-left", x: -8, z: 26 },
+  { id: "orb-shore-right", x: 8, z: 38 },
+  { id: "orb-water", x: -7, z: 52 },
 ] as const;
 
 export const orbPickupRadius = 1.05;
