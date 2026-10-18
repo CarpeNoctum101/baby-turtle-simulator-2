@@ -219,3 +219,39 @@ browser check from the walking cutscene restored the countdown, beach and turtle
 x=0/z=-24. Confirmed the saved TMNT query still renders in the newer game. All 212 tests
 and both client/server TypeScript plus the production build passed after the fix.
 Additional proof: docs/platform-default-course-fixed.jpg and docs/sculpted-turtle-preserved.jpg.
+
+## Sideline humans throwing nets
+
+- Added two original procedural beachgoers at x=-13.8/z=-5 and x=13.8/z=18,
+  outside the playable lane. They wear hats, sunglasses, shirts and shorts; a
+  shoulder pivot winds up and follows through when throwing. Moved the left
+  thrower away from the close palm after checking the initial view.
+- Pure rules in src/mob/netThrower.ts drive wind-up, locked predictive aim,
+  arcing flight, landed net, cooldown and per-racer catches. A gold circle
+  telegraphs the landing. Landed nets catch each racer only once, slowing speed
+  and acceleration to 55% for 2.6 seconds, with a 1.2-second grace period afterward.
+  No health damage or input lock. Shell Guard and Kempy's spin block a hit; a
+  body slam or seagull carry prevents a catch while the turtle is off the ground.
+- Rope geometry wraps caught turtles and an amber HUD status counts down the
+  remaining seconds. A synthesized catch cue uses the existing Web Audio system.
+  Humans/nets disappear during the ending and all timers clear on restart/rematch.
+  Built before the ending captures beach visibility so orbit/reset remain safe.
+- Local race only, including the practice rival. No client-only net penalties
+  are sent to the authoritative online server. No packages, paid services, API
+  calls or downloaded assets were added; cost $0. Static body parts merge by
+  material, rope clones share geometry, and the added geometry stays below the
+  tested 20,000-triangle / 35-mesh limit (including inactive ropes and reticles).
+- Automated: all 40 test files / 223 tests pass, including 11 new tests for aim
+  locking/dodging, cooldown, recovery/grace, shields, spin, body slam, racer hits,
+  invalid frame times, off-lane human bounds, finite geometry, buffer sharing and
+  visibility/reset. Client/server TypeScript and production Vite build pass.
+  Existing large-chunk warning remains (about 2.70 MB / 708 kB gzip main bundle).
+- Browser: drove an actual local beach race, saw arcing nets, caught both racers
+  with health still 50/50, saw the player net/status expire and movement resume,
+  then reached the finish and watched the platform rise and the turtle walk up
+  the stable deck. R from the ending restored the course, people and fresh nets;
+  the next race caught the turtle again. No console warnings/errors observed.
+  Shield/dodge branches are covered by automated tests; physical controllers,
+  actual online connections and low-end-device performance were not tested.
+
+Browser proof: docs/net-caught.jpg. Local run/build commands are in README.md.

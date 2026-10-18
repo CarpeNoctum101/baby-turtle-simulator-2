@@ -147,6 +147,28 @@ Four seagulls guard the course: two on the dry sand (z = -8 and 4), one on the w
 Credit: "Seagull" by Bwinji Shamutete (https://sketchfab.com/MangyMedusa), CC BY 4.0,
 https://sketchfab.com/3d-models/seagull-dd79fddb754f47caa3145e7d184e3e58
 
+## People throwing nets (local race)
+
+Two beachgoers stand outside the course, on opposite sides. A nearby turtle makes
+them wind up for 0.85 seconds, then throw a visible rope net along a 1.1-second arc.
+The gold landing circle follows their aim until release, then stays fixed: move
+sideways to dodge it. A landed net lasts 1.8 seconds and can catch each racer once.
+
+A catch reduces speed and acceleration to 55% for 2.6 seconds. You can still steer
+and crawl; the ropes and the amber status message disappear when the timer ends.
+Nets take no health. Shell Guard consumes its charge to block a catch; Kempy's
+active spin also blocks it. A short grace period prevents repeated catches from
+immediately stacking. Both the player and the practice rival can be caught.
+
+These humans and ropes are original procedural geometry with shared rope buffers,
+merged body parts and no texture downloads or new dependencies. Nets freeze at the
+finish, disappear during the rocket cutscene and reset on R/rematch. They are only
+enabled in local races; the online server's existing race rules are unchanged.
+
+To try it: run `npm run dev -- --host 127.0.0.1`, open the printed URL with
+`?beachPreview=1`, and click **Start race**. Watch both sides as you approach the
+middle of the beach. The default course also includes the hazard.
+
 ## Milestones
 
 The merged prototype includes scene/input/movement/finish detection, local race flow,

@@ -46,6 +46,11 @@ export function createAbilityCues(): AbilityCues {
 
 function playCue(ctx: AudioContext, cue: AbilityCue): void {
   const now = ctx.currentTime;
+  if (cue === "net-catch") {
+    noise(ctx, now, 0.13);
+    tone(ctx, 180, now, 0.16, "triangle", 0.04);
+    return;
+  }
   if (cue === "pickup") {
     tone(ctx, 520, now, 0.08, "sine", 0.06);
     tone(ctx, 780, now + 0.09, 0.12, "sine", 0.06);

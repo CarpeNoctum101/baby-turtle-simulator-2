@@ -28,6 +28,13 @@ Players start at a nesting beach. A countdown begins and the turtles crawl acros
 
 Spinning Mario Kart-style question-mark item boxes provide temporary abilities. Players use these abilities to gain speed or disrupt rivals. Players finish by reaching a defined ocean zone. Keep the existing TideOrb protocol IDs and pickup rules internally.
 
+Local races also have two people outside the lane who throw rope nets. Telegraph
+each throw with an arm wind-up and a landing circle; lock the aim at release so it
+can be dodged. A catch slows crawling briefly without damage or locking controls.
+Shell Guard and Kempy's spin block incoming nets. Reset clears all net state and
+the hazard stops during the automatic ending. Keep this local until the online
+server has matching authoritative rules. Create the people and nets procedurally.
+
 The first version needs one polished beach course and a working start-to-finish race. Do not create an open world.
 
 ## Finish celebration

@@ -26,6 +26,8 @@ import { clampToBeach, clampToCourse, isInFinishZone, isInWaveZone, surfaceAt } 
 import { createTurtleMotion, planFromYaw, stepTurtle, type DriveInput, type TurtleMotion } from "../movement/stepTurtle";
 import { createSeagullMobs } from "../mob/createSeagull";
 import { seagullSpawns } from "../mob/seagull";
+import { createNetThrowers } from "../mob/createNetThrowers";
+import { netSpeedScale, netThrowerSpawns } from "../mob/netThrower";
 import { compareResults, syncedRemaining } from "../../shared/raceFlow";
 import { slotPose } from "../../shared/roomState";
 import type { LoadoutMessage, PublicOrb, PublicPlayer, RoomPhase, Ticket } from "../../shared/protocol";
@@ -82,6 +84,7 @@ export interface GameUi {
   leaveRoomButton: HTMLButtonElement;
   inputDevices: HTMLFieldSetElement;
   healthHud: HTMLElement;
+  netStatus: HTMLElement;
   healthLabel: HTMLElement;
   healthFill: HTMLElement;
   rivalHealthLabel: HTMLElement;
@@ -122,6 +125,8 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
   const mouse = createMouseLook(canvas);
   const cues = createAbilityCues();
   const fx = createAbilityFx(scene, turtle.visual);
+  // Build these before the ending records the beach meshes for its hide/restore pass.
+  const netters = createNetThrowers(scene, turtle.visual, rivalTurtle.visual, beachPreview);
   // Capture the rival and ability meshes as part of the beach to restore on rematch.
   const spaceEnding = createSpaceEnding(scene, turtle);
   const inactiveEffects = createEffects();
@@ -132,7 +137,7 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
   let race = createRaceState();
   let ending: EndingState | null = null;
   let turtleType = turtleTypes[defaultTurtleType];
-  let world: AbilityWorld = createAbilityWorld(turtleType.maxHealth, seagullSpawns);
+  let world: AbilityWorld = createAbilityWorld(turtleType.maxHealth, seagullSpawns, netThrowerSpawns);
   const mobs = createSeagullMobs(scene, world.seagulls);
   let rescuing = false;
   let playerLift = 0;
@@ -150,7 +155,7 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
   const heldEdges = new Set<string>();
   let online = false;
 
-  const freshWorld = () => createAbilityWorld(turtleType.maxHealth, seagullSpawns);
+  const freshWorld = () => createAbilityWorld(turtleType.maxHealth, seagullSpawns, online ? [] : netThrowerSpawns);
 
   const placeTurtle = (body: PlaceholderTurtle, next: TurtleMotion, lift = 0) => {
     body.root.position.set(next.x, lift, next.z);
@@ -788,7 +793,7 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     }
 
     if (!online && (race.phase === "racing" || race.phase === "countdown")) {
-      const playerPace = turtleType.speedScale * exhaustionScale(world.playerHealth);
+      const playerPace = turtleType.speedScale * exhaustionScale(world.playerHealth) * netSpeedScale(world.nets, "player");
       motion = stepTurtle(motion, drive, dt, planFromYaw(look.yaw), scaleCrawl(speedModifiers(world.loadout.effects), playerPace));
       motion = {
         ...motion,
@@ -796,7 +801,8 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
         z: clampToCourse(motion.z + shift.z),
       };
       if (race.phase === "racing") {
-        rival = stepRival(rival, motion, dt, scaleCrawl(speedModifiers(world.rivalEffects), exhaustionScale(world.rivalHealth)));
+        rival = stepRival(rival, motion, dt, scaleCrawl(speedModifiers(world.rivalEffects),
+          exhaustionScale(world.rivalHealth) * netSpeedScale(world.nets, "rival")));
       }
     } else if (online && canOnlineDrive && !ending) {
       motion = stepTurtle(motion, drive, dt, planFromYaw(look.yaw), speedModifiers(world.loadout.effects));
@@ -892,6 +898,12 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     stepTurtleAnimation(rivalAnimation, rivalTurtle.visual, rivalTurtle.flippers, canDrive(race.phase) ? rival.speed : 0, dt, false);
     const showOnlineFx = online && !endingFrame && (onlinePhase === "countdown" || onlinePhase === "racing");
     mobs.sync(world.seagulls, clock);
+    netters.sync(world.nets, clock, !online && !endingFrame);
+    ui.netStatus.hidden = online || !!endingFrame || race.phase !== "racing" || world.nets.slow.player <= 0;
+    // Keep the live-region text stable; updating the timer every frame causes repeated announcements.
+    const netSeconds = Math.ceil(world.nets.slow.player);
+    const netLabel = `Caught in a net · ${netSeconds}s · Keep crawling!`;
+    if (ui.netStatus.textContent !== netLabel) ui.netStatus.textContent = netLabel;
     fx.sync({
       time: clock,
       orbs: endingFrame ? [] : online ? (showOnlineFx ? world.orbs : []) : world.orbs,

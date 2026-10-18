@@ -34,6 +34,7 @@ const inputDevices = document.querySelector<HTMLFieldSetElement>("#inputChoice")
 
 const byId = (id: string) => document.querySelector<HTMLElement>(`#${id}`);
 const healthHud = byId("healthHud");
+const netStatus = byId("netStatus");
 const healthLabel = byId("healthLabel");
 const healthFill = byId("healthFill");
 const rivalHealthLabel = byId("rivalHealthLabel");
@@ -77,6 +78,7 @@ const ui: GameUi | null =
   leaveRoomButton &&
   inputDevices &&
   healthHud &&
+  netStatus &&
   healthLabel &&
   healthFill &&
   rivalHealthLabel &&
@@ -117,6 +119,7 @@ const ui: GameUi | null =
         leaveRoomButton,
         inputDevices,
         healthHud,
+        netStatus,
         healthLabel,
         healthFill,
         rivalHealthLabel,
