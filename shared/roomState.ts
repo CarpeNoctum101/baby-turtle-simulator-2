@@ -196,6 +196,11 @@ export function closeIfAbandoned(state: RoomState, now: number): RoomState {
   };
 }
 
+/** The client and server share this rule so prediction cannot crawl before Go. */
+export function canMoveInRoom(phase: RoomPhase, place: number): boolean {
+  return (phase === "lobby" || phase === "racing") && place === 0;
+}
+
 export function applyPose(
   state: RoomState,
   playerId: string,
@@ -208,10 +213,7 @@ export function applyPose(
   if (!player || !player.connected || state.phase === "closed") {
     return { ok: false, reason: "missing", pose: player ? poseOf(player) : null };
   }
-  if (state.phase !== "lobby" && state.phase !== "racing") {
-    return { ok: false, reason: "phase", pose: poseOf(player) };
-  }
-  if (player.place > 0) {
+  if (!canMoveInRoom(state.phase, player.place)) {
     return { ok: false, reason: "phase", pose: poseOf(player) };
   }
   if (now - player.lastPoseAt < minPoseIntervalMs) {

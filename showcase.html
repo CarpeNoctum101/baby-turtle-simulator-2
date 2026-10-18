@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Baby Turtle — cinematic edit</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #0b1013; color: #e8eee9; font: 15px system-ui,sans-serif; }
+    main { max-width: 1280px; margin: auto; padding: 24px; }
+    h1 { font-size: 22px; margin: 0 0 8px; }
+    p { color: #b8c5c5; line-height: 1.5; }
+    #film { width: 100%; aspect-ratio: 16/9; display: block; background: black; }
+    #scene { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+    .controls { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin: 16px 0; }
+    button, #download { background: #a6ebce; color: #11251e; border: 0; padding: 12px 18px; border-radius: 6px; font: inherit; cursor: pointer; text-decoration: none; }
+    button:disabled { opacity: .4; cursor: wait; }
+    input[type=number] { width: 75px; padding: 8px; }
+    label { display: inline-flex; gap: 8px; align-items: center; }
+    #status { min-height: 24px; }
+    .ending-overlay { display: none !important; }
+  </style>
+</head>
+<body><main>
+  <h1>Baby Turtle Simulator 2 · cinematic edit</h1>
+  <p>32 seconds · 1080p · fixed close-ups, orbit, tracking shots and a launch finish. Uses the game's own models and environment.</p>
+  <canvas id="film" width="1920" height="1080" aria-label="Cinematic preview"></canvas>
+  <canvas id="scene" width="1920" height="1080" aria-hidden="true"></canvas>
+  <div class="controls">
+    <button id="preview" disabled>Preview edit</button>
+    <button id="record" disabled>Record silent draft</button>
+    <a id="download" hidden download>Save recording</a>
+  </div>
+  <label>Inspect a shot <input id="time" type="range" min="0" max="31.99" value="0.7" step="0.1" style="width:400px" /></label>
+  <div class="controls">
+    <label>Song audio <input id="music" type="file" accept="audio/*" /></label>
+    <label>Song starts at <input id="offset" type="number" min="0" value="0" step="0.1" /> seconds</label>
+  </div>
+  <p id="status" role="status">Loading the game assets…</p>
+  <p>The Spotify link identifies the song but does not supply an editable audio file. Add your MP3/WAV to include it. Audio stays on this computer. This page is a separate filming tool; the race is unchanged.</p>
+</main><script type="module" src="/src/dev/showcase.ts"></script></body></html>

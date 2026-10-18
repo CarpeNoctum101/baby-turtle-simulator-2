@@ -14,64 +14,84 @@ export interface MouseLook {
 }
 
 /**
- * The camera turns only while the right mouse button is held.
- * A normal click does not capture the cursor, so holding W cannot spin the view.
+ * Drag with either mouse button, including a trackpad's normal click, to look.
+ * Pointer capture keeps a drag working outside the canvas without locking the cursor.
  */
 export function createMouseLook(canvas: HTMLCanvasElement): MouseLook {
   let pendingYaw = 0;
   let pendingPitch = 0;
-  let looking = false;
+  let activePointer: number | null = null;
+  let lastX = 0;
+  let lastY = 0;
   let shooting = false;
+
+  const endDrag = () => {
+    const pointer = activePointer;
+    activePointer = null;
+    shooting = false;
+    if (pointer !== null && canvas.hasPointerCapture(pointer)) {
+      canvas.releasePointerCapture(pointer);
+    }
+  };
 
   const onContextMenu = (event: Event) => {
     event.preventDefault();
   };
 
   const onPointerDown = (event: PointerEvent) => {
-    if (event.button === 0) {
-      shooting = true;
-      canvas.focus();
-    }
-    if (event.button !== 2) {
+    if ((event.button !== 0 && event.button !== 2) || activePointer !== null) {
       return;
     }
-    looking = true;
+    event.preventDefault();
+    activePointer = event.pointerId;
+    lastX = event.clientX;
+    lastY = event.clientY;
+    shooting = (event.buttons & 1) !== 0;
     canvas.focus();
+    canvas.setPointerCapture(event.pointerId);
   };
 
   const onPointerUp = (event: PointerEvent) => {
-    if (event.button === 0) {
-      shooting = false;
-    }
-    if (event.button === 2) {
-      looking = false;
+    if (event.pointerId === activePointer) {
+      endDrag();
     }
   };
 
   const onBlur = () => {
-    looking = false;
-    shooting = false;
+    endDrag();
+    pendingYaw = 0;
+    pendingPitch = 0;
   };
 
-  const onMouseMove = (event: MouseEvent) => {
-    if (!looking) {
+  const onPointerMove = (event: PointerEvent) => {
+    if (event.pointerId !== activePointer) {
       return;
     }
-    const movementX = clamp(event.movementX, -50, 50);
-    const movementY = clamp(event.movementY, -50, 50);
+    if ((event.buttons & 3) === 0) {
+      endDrag();
+      return;
+    }
+    shooting = (event.buttons & 1) !== 0;
+    // Client coordinates work on trackpads and browsers that report movementX/Y as zero.
+    const movementX = clamp(event.clientX - lastX, -50, 50);
+    const movementY = clamp(event.clientY - lastY, -50, 50);
+    lastX = event.clientX;
+    lastY = event.clientY;
     pendingYaw -= movementX * controlSettings.mouseYawSensitivity;
     pendingPitch += movementY * controlSettings.mousePitchSensitivity;
   };
 
   canvas.addEventListener("contextmenu", onContextMenu);
   canvas.addEventListener("pointerdown", onPointerDown);
+  canvas.addEventListener("lostpointercapture", onPointerUp);
   window.addEventListener("pointerup", onPointerUp);
+  window.addEventListener("pointercancel", onPointerUp);
   window.addEventListener("blur", onBlur);
-  window.addEventListener("mousemove", onMouseMove);
+  window.addEventListener("pointermove", onPointerMove);
 
   return {
     get pointerLocked() {
-      return looking;
+      return activePointer !== null;
     },
     get shooting() {
       return shooting;
@@ -85,11 +105,12 @@ export function createMouseLook(canvas: HTMLCanvasElement): MouseLook {
     dispose() {
       canvas.removeEventListener("contextmenu", onContextMenu);
       canvas.removeEventListener("pointerdown", onPointerDown);
+      canvas.removeEventListener("lostpointercapture", onPointerUp);
       window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
       window.removeEventListener("blur", onBlur);
-      window.removeEventListener("mousemove", onMouseMove);
-      looking = false;
-      shooting = false;
+      window.removeEventListener("pointermove", onPointerMove);
+      onBlur();
     },
   };
 }

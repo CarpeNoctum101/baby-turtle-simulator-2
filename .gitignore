@@ -158,3 +158,6 @@ worker-configuration.d.ts
 
 # Empty local scratch repository; it has no commit for the parent to reference.
 /Untitled/
+
+# Locally recorded videos and export metadata.
+/artifacts/showcase/

@@ -102,7 +102,7 @@ async function main() {
   const host = await openSocket(hostTicket);
   const guest = await openSocket(guestTicket);
   const hostWelcome = await waitFor(host, (message) => message.type === "welcome");
-  await waitFor(guest, (message) => message.type === "welcome");
+  const guestWelcome = await waitFor(guest, (message) => message.type === "welcome");
   check("both clients joined the lobby", hostWelcome.phase === "lobby");
 
   const early = host.messages.length;
@@ -123,8 +123,22 @@ async function main() {
   const countdown = await waitFor(host, (message) => message.type === "phase" && message.phase === "countdown" && host.messages.indexOf(message) >= marked);
   check("countdown is a shared server clock", typeof countdown.endsAt === "number" && countdown.snap === true);
 
+  // Both sockets try to crawl early. Their last official poses must stay on the grid.
+  const guestCountdown = await waitFor(guest, (message) => message.type === "phase" && message.phase === "countdown");
+  check("both clients share the countdown deadline", guestCountdown.endsAt === countdown.endsAt);
+  for (const client of [host, guest]) {
+    const welcome = await waitFor(client, (message) => message.type === "welcome");
+    client.send({ type: "pose", x: welcome.x, z: welcome.z + 1, heading: 0, speed: 4 });
+  }
+
   const racing = await waitFor(host, (message) => message.type === "phase" && message.phase === "racing", 6000);
   check("countdown advances without another click", racing.startedAt === countdown.endsAt);
+  const rosterAtGo = await waitFor(host, (message) => message.type === "roster" && message.phase === "racing");
+  for (const [label, ticket, welcome] of [["host", hostTicket, hostWelcome], ["guest", guestTicket, guestWelcome]]) {
+    const player = rosterAtGo.players.find((entry) => entry.id === ticket.playerId);
+    check(`${label} stays on the grid until Go`,
+      player?.x === welcome.x && player?.z === welcome.z && player?.speed === 0);
+  }
 
   const nest = host.messages.length;
   host.send({ type: "finish" });
@@ -146,7 +160,7 @@ async function main() {
   const farOrb = await waitFor(host, (message) => message.type === "rejected" && host.messages.indexOf(message) >= far);
   check("a far Tide Orb cannot be claimed", farOrb.reason.includes("too far"));
 
-  const orb = { x: -5.5, z: -16 };
+  const orb = { x: -8, z: -14 };
   let position = await walk(host, hostWelcome, orb);
   const claimedAt = host.messages.length;
   host.send({ type: "pickup", orb: "orb-nest-left" });
@@ -168,7 +182,7 @@ async function main() {
   const repeated = await waitFor(host, (message) => message.type === "rejected" && host.messages.indexOf(message) >= secondAbility);
   check("the spent ability cannot be activated again", repeated.reason.includes("running") || repeated.reason.includes("do not hold"));
 
-  position = await walk(host, position, { x: 0, z: 52 });
+  position = await walk(host, position, { x: 0, z: 66 });
   const finishAt = host.messages.length;
   host.send({ type: "finish" });
   const finished = await waitFor(host, (message) => message.type === "finish" && host.messages.indexOf(message) >= finishAt);

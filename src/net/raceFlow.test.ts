@@ -15,8 +15,9 @@ import {
   setReady,
   syncedRemaining,
 } from "../../shared/raceFlow";
-import { abandonAfterMs, applyPose, connectPlayer, disconnectPlayer, joinRoom, openRoom } from "../../shared/roomState";
+import { abandonAfterMs, applyPose, canMoveInRoom, connectPlayer, disconnectPlayer, joinRoom, openRoom } from "../../shared/roomState";
 import type { RoomState } from "../../shared/roomState";
+import { stepTurtle, type TurtleMotion } from "../movement/stepTurtle";
 
 const now = 1_000_000;
 
@@ -99,6 +100,37 @@ describe("race transitions", () => {
     if (!crawled.ok) {
       expect(crawled.reason).toBe("phase");
     }
+  });
+
+  it("holds both clients on their pads with movement held until the server starts racing", () => {
+    const started = requestStart(readyRoom(), "host", now + 400);
+    if (!started.ok) throw new Error("start failed");
+    const deadline = started.state.countdownEndsAt!;
+    for (const player of started.state.players) {
+      let motion: TurtleMotion = { x: player.x, z: player.z, heading: player.heading, speed: 0, steer: 0 };
+      const home = { ...motion };
+      // Even a locally expired timer cannot unlock prediction before the server's racing phase.
+      for (let frame = 0; frame < 200; frame++) {
+        if (canMoveInRoom(started.state.phase, player.place)) {
+          motion = stepTurtle(motion, { throttle: 1, steer: 1, brake: false }, 1 / 60);
+        }
+      }
+      expect(motion).toEqual(home);
+      const rejected = applyPose(started.state, player.id, { ...motion, z: motion.z + 1 }, deadline - 1);
+      expect(rejected).toMatchObject({ ok: false, reason: "phase" });
+      const racing = advanceRace(started.state, deadline).state;
+      expect(canMoveInRoom(racing.phase, player.place)).toBe(true);
+      motion = stepTurtle(motion, { throttle: 1, steer: 0, brake: false }, 1 / 60);
+      expect(motion.z).toBeGreaterThan(home.z);
+      expect(applyPose(racing, player.id, motion, deadline + 50).ok).toBe(true);
+    }
+  });
+
+  it("keeps lobby movement available and stops finished racers", () => {
+    expect(canMoveInRoom("lobby", 0)).toBe(true);
+    expect(canMoveInRoom("racing", 1)).toBe(false);
+    expect(canMoveInRoom("finished", 0)).toBe(false);
+    expect(canMoveInRoom("closed", 0)).toBe(false);
   });
 
   it("lets a disconnected hatchling leave without freezing the others", () => {

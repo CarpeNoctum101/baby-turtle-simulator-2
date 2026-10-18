@@ -29,7 +29,7 @@ export function formatHud(model: HudModel): string {
     `Speed: ${model.speed.toFixed(2)}    Position: x ${model.x.toFixed(1)}, z ${model.z.toFixed(1)}`,
     `Active movement: ${model.movementSource === "keyboard" ? "Keyboard (WASD)" : "Gamepad left stick"}`,
     `Active look: ${model.lookSource === "mouse" ? "Mouse" : "Gamepad right stick"}`,
-    "Hold the right mouse button and drag to look. The view stays still while you only hold W or stick up.",
+    "Click and drag with the mouse or trackpad to look (either button). The view stays still while you only hold W or stick up.",
     "W or the left stick moves the way the camera looks. A, D, or the left stick move sideways. Only the right stick turns the camera. Space brakes. X or RT uses the held ability. Bubble Shot arms and fires on that same press. R restarts. H hides this readout.",
     `Ability: ${model.abilityLine}`,
     `[ and ] change the stick dead zone. Current dead zone: ${model.deadZone.toFixed(2)}`,

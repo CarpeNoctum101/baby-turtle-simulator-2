@@ -31,7 +31,7 @@ import { seagullSpawns } from "../mob/seagull";
 import { createNetThrowers } from "../mob/createNetThrowers";
 import { netSpeedScale, netThrowerSpawns } from "../mob/netThrower";
 import { compareResults, syncedRemaining } from "../../shared/raceFlow";
-import { slotPose } from "../../shared/roomState";
+import { canMoveInRoom, slotPose } from "../../shared/roomState";
 import type { LoadoutMessage, PublicOrb, PublicPlayer, RoomPhase, Ticket } from "../../shared/protocol";
 import { normalizeRoomCode } from "../../shared/protocol";
 import {
@@ -1004,7 +1004,7 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
     }
     menuWasDown = menuDown;
     const movement = combineMovement(limited.keyboard, limited.gamepad);
-    const canOnlineDrive = onlinePhase === "lobby" || onlinePhase === "countdown" || (onlinePhase === "racing" && selfPlace === 0);
+    const canOnlineDrive = canMoveInRoom(onlinePhase, selfPlace);
     const localDrive = canDrive(race.phase) && !controlsLocked;
     const drive = !ending && (online ? canOnlineDrive && !controlsLocked : localDrive) ? movement : idleDrive;
     const netted = world.nets.slow.player > 0;
@@ -1046,7 +1046,7 @@ export function startGame(canvas: HTMLCanvasElement, ui: GameUi, beachPreview = 
       }
     }
     let shift = { x: 0, z: 0 };
-    const onlineLive = online && !ending && selfPlace === 0 && (onlinePhase === "countdown" || onlinePhase === "racing");
+    const onlineLive = online && !ending && selfPlace === 0 && onlinePhase === "racing";
     let hazardsSimulated = false;
     if ((race.phase === "racing" && !online) || onlineLive) {
       hazardsSimulated = true;

@@ -23,6 +23,19 @@ Open
 http://127.0.0.1:5173/?beachPreview=1 (or select **Explore the beach preview**)
 for the tropical beach asset study. Both use the same movement and finish logic.
 
+For local multiplayer, keep Vite running and open a second terminal in the same folder:
+
+```sh
+npm run server
+```
+
+Select **Play → Multiplayer → Create room**. Open the game in another browser tab,
+select **Multiplayer → Join room**, and enter the room code. Ready both players,
+then let the host select **Start race**. Hold W during 3, 2, 1: both turtles must
+stay on their starting pads until Go. Click and drag on the beach with either mouse
+button or the trackpad's normal click to check the camera in either mode.
+These local servers do not publish or deploy the game.
+
 If port 5173 is already in use, choose another port:
 
 ```sh
@@ -48,7 +61,9 @@ printed **Local** URL. Run only one dependency installation at a time.
   A / D or Left / Right: move sideways relative to the camera.
 - Space: brake. X: use the stored item-box ability. R: restart at the nest with a new countdown.
   H: show or hide the readout.
-- Hold the right mouse button and drag to look around; the camera stays still while you crawl.
+- Click and drag with the mouse or trackpad to look around (left or right button);
+  release to stop looking. The camera stays still while you only crawl.
+  Left click also fires an armed Bubble Shot; F is the keyboard firing alternative.
 - Scroll to zoom. The beach preview starts facing the palms with the readout hidden;
   use H or **Show readout** for controls/status. The cinematic takes over at the finish.
 - Xbox-compatible gamepad mapping remains available; press a controller button to expose it to the browser.
@@ -178,6 +193,68 @@ finished. An online room can share the countdown, Tide Orbs, abilities and finis
 order when the local multiplayer server is running. Deployment is still separate.
 The practice rival is local.
 
+## Cinematic edit (local filming tool)
+
+With `npm run dev` running, open http://127.0.0.1:5173/showcase.html.
+This separate page directs a 32-second montage using the game's actual turtle,
+beach, item boxes and rocket ending. Seven shots use fixed cameras; the others use
+orbits, chase cameras and tracking moves. It does not change race controls or rules.
+Use **Inspect a shot** to check framing, **Preview edit** to play, and **Record
+silent draft** followed by **Save recording** to capture the 1080p scene alone.
+Keep the filming tab visible until the recording finishes. No desktop, browser
+controls, microphone, notifications or other apps are captured.
+
+The requested song is **SaWaDiKa X Tokyo Drift — NovaX, Sevven**. Its Spotify URL
+does not provide an editable audio file. To include the exact song, select your
+local MP3/WAV under **Song audio**, choose its start time, and use **Record with
+music**. The file stays in the browser. The initial visual draft has no music;
+cut timing still needs to be matched to the supplied track.
+
+To make an H.264 MP4 and contact sheet with the free, locally installed FFmpeg:
+
+```sh
+node scripts/export-showcase.mjs /absolute/path/to/baby-turtle-edit-silent.webm
+```
+
+Or add a local song file starting at a chosen time (here, 12 seconds):
+
+```sh
+node scripts/export-showcase.mjs /absolute/path/to/baby-turtle-edit-silent.webm /absolute/path/to/song.mp3 12
+```
+
+Exports, credits and export metadata are placed in `artifacts/showcase/` and ignored
+by Git. The scene uses the existing assets; recording uses the browser's built-in
+canvas capture and MediaRecorder. No packages, paid APIs or services are added.
+
+To add the stronger effects to the finished 31-second music edit, run:
+
+```sh
+python3 scripts/add-showcase-effects.py
+```
+
+This makes `artifacts/showcase/baby-turtle-edit-effects.mp4`. It detects stronger
+bass attacks for zoom punches, shake, short motion trails and RGB splits, then
+adds a warmer grade, soft glow and fine grain. Fixed-camera shots keep their
+framing. The first 31 seconds of the song are copied without re-encoding. The
+original edit remains available; the effects timings and filter graph are saved
+beside the new export for adjustment.
+
+To prepend the supplied Roblox news photo, four floating turtle cutouts and five
+recorded voices, run:
+
+```sh
+python3 scripts/add-news-intro.py
+```
+
+The photo stays still. Only the turtle cutouts drift and gently rotate. The five
+original voice recordings are level-balanced and overlap by 0.55 seconds at each
+handoff. The news intro plays before the existing game edit and its first 31
+seconds of music. The full export is
+`artifacts/showcase/baby-turtle-edit-news-intro.mp4`; the standalone intro,
+voice mix and timing metadata are saved beside it. Supplied media is copied into
+the ignored `artifacts/showcase/news-assets/` folder so temporary image attachments
+remain available for a local re-export. This uses the existing FFmpeg and Pillow.
+
 ## Automated checks and production preview
 
 ```sh
@@ -185,6 +262,13 @@ npm test
 npm run build
 npm run preview -- --host 127.0.0.1
 ```
+
+With `npm run server` running, `node scripts/check-race-clients.mjs` exercises two
+local WebSocket clients, including early movement attempts from both starting pads.
+Mouse listener tests cover primary/secondary dragging, zero relative movement
+readings, release, cancellation and focus loss. Browser automation checks click-drag
+camera movement; physical trackpad gestures and controller hardware still need a
+manual check.
 
 Open http://127.0.0.1:4173/?beachPreview=1 to inspect the built preview.
 Tests cover input, movement, finish detection, HUD formatting, palm/hatchling geometry
