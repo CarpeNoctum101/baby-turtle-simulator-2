@@ -66,8 +66,9 @@ export function resetFollowCamera(rig: FollowCameraRig): void {
 }
 
 /** Puts the camera behind the look direction. The turtle's heading is not used. */
-export function updateFollowCamera(rig: FollowCameraRig, look: LookOffsets, x: number, z: number): void {
-  rig.target.set(x, eyeHeight, z);
+export function updateFollowCamera(rig: FollowCameraRig, look: LookOffsets, x: number, z: number, lift = 0): void {
+  // While a seagull carries the turtle the view rises with it, so the ride stays on screen.
+  rig.target.set(x, eyeHeight + lift * 0.8, z);
   rig.camera.alpha = restAlpha + look.yaw;
   rig.camera.beta = clamp(restBeta + look.pitch, minBeta, maxBeta);
   rig.camera.radius = rig.radius;

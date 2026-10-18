@@ -1,5 +1,6 @@
 import { applyCollisionPenalty, type RacerEffects } from "./abilityState";
 import { clampDt } from "./clock";
+import { damageRules } from "./health";
 import type { TurtleMotion } from "../movement/stepTurtle";
 
 /** Driftwood and shell piles. Touching one is a collision penalty. */
@@ -59,12 +60,26 @@ export function resolveCollisions(
   player: CollisionBody,
   rival: CollisionBody,
   book: ContactBook,
-): { player: CollisionBody; rival: CollisionBody; book: ContactBook; blocked: boolean; bumped: boolean } {
+): {
+  player: CollisionBody;
+  rival: CollisionBody;
+  book: ContactBook;
+  blocked: boolean;
+  bumped: boolean;
+  /** Health each racer loses this frame. A blocked hit costs nothing. */
+  playerDamage: number;
+  rivalDamage: number;
+} {
   let nextBook = book;
   let nextPlayer: CollisionBody = { ...player, motion: { ...player.motion }, effects: { ...player.effects } };
   let nextRival: CollisionBody = { ...rival, motion: { ...rival.motion }, effects: { ...rival.effects } };
   let blocked = false;
   let bumped = false;
+  const damage = { player: 0, rival: 0 };
+  const hurt = (id: string, amount: number) => {
+    if (id === "player") damage.player += amount;
+    else damage.rival += amount;
+  };
 
   const strike = (body: CollisionBody, key: string): CollisionBody => {
     if (!contactOpen(nextBook, key)) {
@@ -74,6 +89,7 @@ export function resolveCollisions(
     nextBook = armContact(nextBook, key);
     blocked = blocked || hit.blocked;
     bumped = bumped || !hit.blocked;
+    if (!hit.blocked) hurt(body.id, damageRules.debris);
     return { ...body, motion: hit.motion, effects: hit.effects };
   };
 
@@ -97,8 +113,10 @@ export function resolveCollisions(
       nextBook = armContact(nextBook, "pair");
       blocked = blocked || playerHit.blocked || rivalHit.blocked;
       bumped = bumped || !playerHit.blocked || !rivalHit.blocked;
+      if (!playerHit.blocked) hurt("player", damageRules.rivalBump);
+      if (!rivalHit.blocked) hurt("rival", damageRules.rivalBump);
     }
   }
 
-  return { player: nextPlayer, rival: nextRival, book: nextBook, blocked, bumped };
+  return { player: nextPlayer, rival: nextRival, book: nextBook, blocked, bumped, playerDamage: damage.player, rivalDamage: damage.rival };
 }

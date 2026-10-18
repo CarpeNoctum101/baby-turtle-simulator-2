@@ -9,6 +9,7 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import type { Scene } from "@babylonjs/core/scene";
 import type { PlaceholderTurtle } from "./createPlaceholderTurtle";
 import type { FlipperRig } from "./animateTurtle";
+import { createHeadRig } from "./headRig";
 
 /** Original hatchling study. Same roots and four flipper rigs as the existing animation. */
 export function createDetailedTurtle(scene: Scene): PlaceholderTurtle {
@@ -29,12 +30,12 @@ export function createDetailedTurtle(scene: Scene): PlaceholderTurtle {
   eye.metallic = 0;
   eye.roughness = 0.1;
 
-  const ellipsoid = (name: string, scale: Vector3, position: Vector3, material: PBRMaterial, segments = 24) => {
+  const ellipsoid = (name: string, scale: Vector3, position: Vector3, material: PBRMaterial, segments = 24, parent: TransformNode = visual) => {
     const mesh = MeshBuilder.CreateSphere(name, { diameter: 1, segments }, scene);
     mesh.scaling.copyFrom(scale);
     mesh.position.copyFrom(position);
     mesh.material = material;
-    mesh.parent = visual;
+    mesh.parent = parent;
     return mesh;
   };
   ellipsoid("hatchlingBody", new Vector3(1.08,0.3,1.38), new Vector3(0,0.23,0),skin);
@@ -50,14 +51,15 @@ export function createDetailedTurtle(scene: Scene): PlaceholderTurtle {
   rim.material = skin;
   rim.parent = visual;
   ellipsoid("hatchlingNeck",new Vector3(0.26,0.21,0.44),new Vector3(0,0.23,0.68),skin);
-  ellipsoid("hatchlingHead",new Vector3(0.36,0.26,0.48),new Vector3(0,0.26,0.92),skin);
+  const headRig = createHeadRig(scene, visual, skin, "hatchling", { baseZ: 0.6, y: 0.24, diameter: 0.25 });
+  ellipsoid("hatchlingHead",new Vector3(0.36,0.26,0.48),new Vector3(0,0.26,0.92),skin,24,headRig.head);
   for (const side of [-1,1]) {
-    ellipsoid(`hatchlingEye${side}`,new Vector3(0.045,0.048,0.043),new Vector3(side*0.137,0.31,1.055),eye,16);
-    ellipsoid(`hatchlingNostril${side}`,new Vector3(0.014,0.01,0.012),new Vector3(side*0.052,0.29,1.147),eye,8);
+    ellipsoid(`hatchlingEye${side}`,new Vector3(0.045,0.048,0.043),new Vector3(side*0.137,0.31,1.055),eye,16,headRig.head);
+    ellipsoid(`hatchlingNostril${side}`,new Vector3(0.014,0.01,0.012),new Vector3(side*0.052,0.29,1.147),eye,8,headRig.head);
   }
   const mouth = MeshBuilder.CreateTube("hatchlingMouth", { path: [new Vector3(-0.1,0.205,1.09),new Vector3(0,0.20,1.157),new Vector3(0.1,0.205,1.09)], radius: 0.006, tessellation: 5 },scene);
   mouth.material = eye;
-  mouth.parent = visual;
+  mouth.parent = headRig.head;
   const tail = MeshBuilder.CreateCylinder("hatchlingTail", { height: 0.28, diameterTop: 0.012, diameterBottom: 0.08, tessellation: 10 },scene);
   tail.rotation.x = -Math.PI/2;
   tail.position.set(0,0.12,-0.78);
@@ -90,7 +92,7 @@ export function createDetailedTurtle(scene: Scene): PlaceholderTurtle {
       flippers.push({ mesh:flipper,baseY:flipper.rotation.y,baseZ:flipper.rotation.z,side,role });
     }
   }
-  return {root,visual,flippers,skin,shell};
+  return {root,visual,flippers,skin,shell,setHeadReach:headRig.setReach};
 }
 
 function organicMaterial(scene: Scene, kind: "shell" | "skin"): PBRMaterial {

@@ -5,17 +5,43 @@ Browser-based turtle racing prototype built with Babylon.js, TypeScript and Vite
 
 ## Run locally
 
-Use Node.js 22.12+ (verified here with 24.14.1). From a terminal:
+Install Node.js 22.12+ with npm. Open a terminal in your copy of this project
+(the folder containing `package.json`). On this Mac:
 
 ```sh
-cd /Users/leontruong/Downloads/Clones/baby-turtle-simulator-2
+cd /baby-turtle-simulator-2
 npm ci
 npm run dev -- --host 127.0.0.1
 ```
 
-Open http://127.0.0.1:5173/ for the existing course. Open
+Wait for `npm ci` to finish successfully before starting the server. Keep the
+server terminal open while playing; press **Ctrl+C** in that terminal to stop it.
+On another computer, replace the `cd` path with your project's location.
+
+Open the **Local** URL printed by Vite, normally http://127.0.0.1:5173/.
+Open
 http://127.0.0.1:5173/?beachPreview=1 (or select **Explore the beach preview**)
 for the tropical beach asset study. Both use the same movement and finish logic.
+
+If port 5173 is already in use, choose another port:
+
+```sh
+npm run dev -- --host 127.0.0.1 --port 5175
+```
+
+Then open http://127.0.0.1:5175/ (add `?beachPreview=1` for the beach preview).
+
+If installation reports an npm cache permission error (`EACCES`), use a temporary
+cache on macOS/Linux:
+
+```sh
+npm ci --cache /tmp/baby-turtle-npm-cache
+```
+
+If the browser reports a missing module inside `node_modules/vite`, stop the
+server and wait for any running install to finish. Run `npm ci` again (with the
+temporary cache option above if needed), restart the server, and reload its
+printed **Local** URL. Run only one dependency installation at a time.
 
 - Select **Start race** or press Enter for a three-second countdown.
 - W / Up: crawl in the camera's direction. S / Down: move the opposite way.
@@ -62,6 +88,20 @@ The rocket, fictional boarding hatch, dock, exhaust and Earth are original proce
 artwork. There are no additional dependencies, downloaded models or paid services.
 
 ![Raised launch pad and connected boarding walkway](docs/starship-walkway.jpg)
+
+## Seagull
+
+Four seagulls guard the course: two on the dry sand (z = -8 and 4), one on the wet sand (z = 18) and one near the shore (z = 30). The ones at z = 4 and z = 30 are fliers: they circle about 5.5 metres up, stalk the turtle from above, then dive at where it is when the dive starts (steer sideways to dodge), and climb away if they miss. Walkers stay low and chase on the ground. Their spots are listed in `seagullSpawns`. Rules live in `src/mob/seagull.ts`, drawing in `src/mob/createSeagull.ts`.
+
+- It stays put until you come within 10 metres, then chases at 90% of the regular turtle's top speed on the ground under it. It gives up and flies home if it ends up 18 metres from its perch.
+- A touch costs 14 health and knocks the turtle and the gull apart. Shell Guard stops the damage and the turtle's knock-back (the gull still bounces off).
+- At 0 health the gull swoops in, grabs the turtle, carries it up to 22 metres back toward the nest (never past the back of the beach), sets it down, and the turtle gets 40% of its health back. The gull then ignores you for a few seconds. Controls are locked during the carry.
+- Snappy's snap stuns any gull within reach (below 2.4 metres, so a gull circling high up is out of reach) for 2.5 seconds: it drops to the sand, is pushed back and cannot attack. A stunned gull also can't answer the rescue call, so a worn-out turtle waits until a gull recovers.
+- The model is `public/models/seagull.glb`. It has no animation, so the gull glides rather than flapping.
+- Loading it needs the official `@babylonjs/loaders` package (free, Apache-2.0, same version as Babylon core).
+
+Credit: "Seagull" by Bwinji Shamutete (https://sketchfab.com/MangyMedusa), CC BY 4.0,
+https://sketchfab.com/3d-models/seagull-dd79fddb754f47caa3145e7d184e3e58
 
 ## Milestones
 

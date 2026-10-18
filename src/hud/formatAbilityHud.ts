@@ -5,6 +5,8 @@ export type AbilityHudTone = "empty" | "active" | "shield" | "spray" | "wave" | 
 
 export interface AbilityHudInput {
   held: AbilityId | null;
+  /** The second slot, for turtles that have one. */
+  spare?: AbilityId | null;
   effects: RacerEffects;
 }
 
@@ -20,6 +22,7 @@ export interface AbilityTimer {
  */
 export interface AbilityHudView {
   stored: AbilityId | null;
+  spare: AbilityId | null;
   timer: AbilityTimer | null;
 }
 
@@ -27,16 +30,18 @@ export interface AbilityHudView {
 export function formatAbilityHud(input: AbilityHudInput): AbilityHudView {
   return {
     stored: input.held,
+    spare: input.spare ?? null,
     timer: activeTimer(input),
   };
 }
 
 export function formatAbilityLine(view: AbilityHudView): string {
   const stored = view.stored ? abilityCatalog[view.stored].name : "empty";
+  const spare = view.spare ? ` (next: ${abilityCatalog[view.spare].name})` : "";
   if (!view.timer) {
-    return `Item box: ${stored}`;
+    return `Item box: ${stored}${spare}`;
   }
-  return `Item box: ${stored}. ${view.timer.label}`;
+  return `Item box: ${stored}${spare}. ${view.timer.label}`;
 }
 
 export function formatPlace(place: number, field: number): string {
